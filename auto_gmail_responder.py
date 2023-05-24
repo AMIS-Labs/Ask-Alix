@@ -25,7 +25,7 @@ OPENAI_MAX_TOKENS = 1024
 OPENAI_TOP_P = 1
 OPENAI_FREQUENCY_PENALTY = 0
 OPENAI_PRESENCE_PENALTY = 0.6
-PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance, générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour Bonjour {sender_name},\n\n{INTRODUCTION_SENTENCE}, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances.
+PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance, générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances."
 
 # Délai de lecture de la boîte de réception (en secondes)
 CHECK_INTERVAL = 60
