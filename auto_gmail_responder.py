@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 import openai
 
 # Informations d'identification Gmail
-GMAIL_ADDRESS = "questions-alix@iassurpro.com"
-GMAIL_APP_PASSWORD = "ifcqvrxgkslcizbm"
+GMAIL_ADDRESS = questions-alix@iassurpro.com
+GMAIL_APP_PASSWORD = ifcqvrxgkslcizbm
 
 # Clé secrète OpenAI
-OPENAI_SECRET_KEY = "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"
+OPENAI_SECRET_KEY = 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
 
 # Options de l'appel API OpenAI
 OPENAI_TEMPERATURE = 0.9
@@ -98,7 +98,7 @@ def generate_response(prompt, personal_info):
 
 def generate_prompt(sender_name, question):
     # Générer le prompt pour OpenAI en fonction du nom de l'expéditeur et de la question
-    prompt = f"Bonjour {sender_name},\n\n{INTRODUCTION_SENTENCE}\n\n"
+    prompt = f"Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}\n\n"
     prompt += f"J'ai bien reçu votre question : {question}\n\n"
     prompt += "Je vais vous fournir une réponse dans les plus brefs délais.\n\n"
     prompt += "Cordialement,\n"
@@ -109,7 +109,7 @@ def generate_prompt(sender_name, question):
 def send_auto_reply(sender, subject, question, response):
     receiver = sender
     reply_subject = f"Re: {subject}"
-    reply_message = f"Bonjour,\n\n{response}\n\n{POLITE_CLOSING}\n\nCordialement,\n{BOT_NAME}"
+    reply_message = f"Bonjour {sender_firstname},\n\n{response}\n\n{POLITE_CLOSING}\n\nCordialement,\n{BOT_NAME}"
 
     send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
 
