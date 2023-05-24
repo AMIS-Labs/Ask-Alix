@@ -50,7 +50,7 @@ def send_gmail(sender_address, receiver_address, mail_subject, mail_content):
 
     session.sendmail(sender_address, receiver_address, text)
     session.quit()
-    print(f"Sent email to {receiver_address} with subject: {mail_subject}")
+    print("Sent email to " + receiver_address + " with subject: " + mail_subject)
 
 def process_email(email_data):
     message = email.message_from_bytes(email_data[0][1])
