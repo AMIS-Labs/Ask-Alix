@@ -11,11 +11,11 @@ from dotenv import load_dotenv
 import openai
 
 # Informations d'identification Gmail
-GMAIL_ADDRESS = questions-alix@iassurpro.com
-GMAIL_APP_PASSWORD = ifcqvrxgkslcizbm
+GMAIL_ADDRESS = "questions-alix@iassurpro.com"
+GMAIL_APP_PASSWORD = "ifcqvrxgkslcizbm"
 
 # Clé secrète OpenAI
-OPENAI_SECRET_KEY = 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
+openai.api_key = os.environ["OPENAI_API_KEY"]
 
 # Options de l'appel API OpenAI
 OPENAI_TEMPERATURE = 0.9
