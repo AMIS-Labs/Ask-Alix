@@ -117,24 +117,27 @@ mailbox = connect_to_mailbox()
 emails = fetch_unread_emails(mailbox)
 
 # Parcourir les e-mails et extraire les informations personnelles
-for email in emails:
-    email_subject = email["Subject"]
-    email_body = ""
 
-    if email.is_multipart():
-        for part in email.get_payload():
-            if part.get_content_type() == "text/plain":
-                email_body = part.get_payload(decode=True).decode("utf-8")
-                break
-    else:
-        email_body = email.get_payload(decode=True).decode("utf-8")
+def process_emails():
+    for email in emails:
+        email_subject = email["Subject"]
+        email_body = ""
 
-    personal_info = extract_personal_info(email_body)
+        if email.is_multipart():
+            for part in email.get_payload():
+                if part.get_content_type() == "text/plain":
+                    email_body = part.get_payload(decode=True).decode("utf-8")
+                    break
+        else:
+            email_body = email.get_payload(decode=True).decode("utf-8")
 
-    print("Sujet:", email_subject)
-    print("Informations personnelles:", personal_info)
-    print("---")
-    
+        personal_info = extract_personal_info(email_body)
+
+        print("Sujet:", email_subject)
+        print("Informations personnelles:", personal_info)
+        print("---")
+
+        return personal_info
 
 def generate_response(prompt, personal_info):
     # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
