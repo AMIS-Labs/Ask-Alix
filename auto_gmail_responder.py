@@ -16,6 +16,7 @@ import openai
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "ifcqvrxgkslcizbm"
+IMAP_SERVER = "imap.gmail.com"
 
 # Clé secrète OpenAI
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -75,7 +76,7 @@ def extract_personal_info(body):
     
     # Fonction pour se connecter à la boîte de réception
 def connect_to_mailbox():
-    mailbox = imaplib.IMAP4_SSL(IMAP_SERVER)
+    mailbox = imaplib.IMAP4_SSL("imap.gmail.com")
     mailbox.login(EMAIL_ADDRESS, PASSWORD)
     mailbox.select("INBOX")
     return mailbox
