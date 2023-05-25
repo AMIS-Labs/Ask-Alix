@@ -15,7 +15,9 @@ import openai
 
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
+EMAIL_ADDRESS = "questions-alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "ifcqvrxgkslcizbm"
+APP_PASSWORD = "ifcqvrxgkslcizbm"
 IMAP_SERVER = "imap.gmail.com"
 PASSWORD = "EM*8@DM#j!ak4h$564x"
 
