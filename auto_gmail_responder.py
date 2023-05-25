@@ -4,6 +4,7 @@ import os
 import time
 import imaplib
 import email
+import spacy
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -71,9 +72,68 @@ def process_email(email_data):
 def extract_personal_info(body):
     soup = BeautifulSoup(body, "html.parser")
     personal_info = {}
+    
+    # Fonction pour se connecter à la boîte de réception
+def connect_to_mailbox():
+    mailbox = imaplib.IMAP4_SSL(IMAP_SERVER)
+    mailbox.login(EMAIL_ADDRESS, PASSWORD)
+    mailbox.select("INBOX")
+    return mailbox
 
-    # Extraire les informations personnelles du corps de l'email
-    # (Nom, Prénom, Job Title, Nom de l'entreprise, Site internet, Profil LinkedIn, etc.)
+# Fonction pour récupérer les e-mails non lus
+def fetch_unread_emails(mailbox):
+    _, data = mailbox.search(None, "UNSEEN")
+    email_ids = data[0].split()
+    emails = []
+    for email_id in email_ids:
+        _, data = mailbox.fetch(email_id, "(RFC822)")
+        raw_email = data[0][1]
+        email_message = email.message_from_bytes(raw_email)
+        emails.append(email_message)
+    return emails
+
+# Fonction pour extraire les informations personnelles du corps de l'e-mail
+# (Nom, Prénom, Job Title, Nom de l'entreprise, Site internet, Profil LinkedIn, etc.)
+def extract_personal_info(body):
+    nlp = spacy.load("fr_core_news_sm")
+    doc = nlp(body)
+
+    personal_info = {}
+
+    # Extraction du nom et du prénom
+    for entity in doc.ents:
+        if entity.label_ == "PER":
+            name_parts = entity.text.split()
+            if len(name_parts) >= 2:
+                personal_info["Nom"] = name_parts[-1]  # Dernier élément du nom
+                personal_info["Prénom"] = " ".join(name_parts[:-1])  # Tous les éléments précédents
+
+    return personal_info
+
+# Se connecter à la boîte de réception
+mailbox = connect_to_mailbox()
+
+# Récupérer les e-mails non lus
+emails = fetch_unread_emails(mailbox)
+
+# Parcourir les e-mails et extraire les informations personnelles
+for email in emails:
+    email_subject = email["Subject"]
+    email_body = ""
+
+    if email.is_multipart():
+        for part in email.get_payload():
+            if part.get_content_type() == "text/plain":
+                email_body = part.get_payload(decode=True).decode("utf-8")
+                break
+    else:
+        email_body = email.get_payload(decode=True).decode("utf-8")
+
+    personal_info = extract_personal_info(email_body)
+
+    print("Sujet:", email_subject)
+    print("Informations personnelles:", personal_info)
+    print("---")
 
     return personal_info
 
@@ -100,11 +160,13 @@ def generate_response(prompt, personal_info):
 
 def generate_prompt(sender_name, question):
     # Générer le prompt pour OpenAI en fonction du nom de l'expéditeur et de la question
-    prompt = f"Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}\n\n"
-    prompt += f"J'ai bien reçu votre question : {question}\n\n"
+    
+    prompt = "Bonjour {},\n\n{}\n\n".format(sender_firstname, INTRODUCTION_SENTENCE)
+    prompt += "J'ai bien reçu votre question : {}\n\n".format(question)
     prompt += "Je vais vous fournir une réponse dans les plus brefs délais.\n\n"
     prompt += "Cordialement,\n"
-    prompt += f"{BOT_NAME}"
+    prompt += "{}".format(BOT_NAME)
+
 
     return prompt
 
