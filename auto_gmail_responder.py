@@ -134,8 +134,7 @@ for email in emails:
     print("Sujet:", email_subject)
     print("Informations personnelles:", personal_info)
     print("---")
-
-    return personal_info
+    
 
 def generate_response(prompt, personal_info):
     # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
