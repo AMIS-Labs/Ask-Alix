@@ -17,6 +17,7 @@ import openai
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "ifcqvrxgkslcizbm"
 IMAP_SERVER = "imap.gmail.com"
+PASSWORD = "EM*8@DM#j!ak4h$564x"
 
 # Clé secrète OpenAI
 openai.api_key = os.environ["OPENAI_API_KEY"]
