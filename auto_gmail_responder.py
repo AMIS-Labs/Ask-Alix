@@ -12,6 +12,8 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import openai
+import schedule
+import time
 
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
@@ -72,9 +74,38 @@ def process_email(email_data):
 
     return sender, subject, body
 
+def run_program():
+    process_emails()
+
+# Planifier l'exécution toutes les 5 minutes
+schedule.every(5).minutes.do(run_program)
+
+# Boucle d'exécution principale
+while True:
+    schedule.run_pending()
+    time.sleep(1)
+
+# Fonction pour extraire les informations personnelles du corps de l'e-mail
+# (Nom, Prénom, Job Title, Nom de l'entreprise, Site internet, Profil LinkedIn, etc.)
+    # Extraction du nom et du prénom
+
 def extract_personal_info(body):
     soup = BeautifulSoup(body, "html.parser")
+    nlp = spacy.load("fr_core_news_sm")
+    doc = nlp(body)
+
     personal_info = {}
+
+    # Extraction du nom et du prénom
+    for entity in doc.ents:
+        if entity.label_ == "PER":
+            name_parts = entity.text.split()
+            if len(name_parts) >= 2:
+                personal_info["Nom"] = name_parts[-1]  # Dernier élément du nom
+                personal_info["Prénom"] = " ".join(name_parts[:-1])  # Tous les éléments précédents
+
+    return personal_info
+
     
     # Fonction pour se connecter à la boîte de réception
 def connect_to_mailbox():
@@ -95,15 +126,7 @@ def fetch_unread_emails(mailbox):
         emails.append(email_message)
     return emails
 
-# Fonction pour extraire les informations personnelles du corps de l'e-mail
-# (Nom, Prénom, Job Title, Nom de l'entreprise, Site internet, Profil LinkedIn, etc.)
-def extract_personal_info(body):
-    nlp = spacy.load("fr_core_news_sm")
-    doc = nlp(body)
 
-    personal_info = {}
-
-    # Extraction du nom et du prénom
     for entity in doc.ents:
         if entity.label_ == "PER":
             name_parts = entity.text.split()
@@ -111,10 +134,61 @@ def extract_personal_info(body):
                 personal_info["Nom"] = name_parts[-1]  # Dernier élément du nom
                 personal_info["Prénom"] = " ".join(name_parts[:-1])  # Tous les éléments précédents
 
-    return personal_info
 
 # Se connecter à la boîte de réception
 mailbox = connect_to_mailbox()
+
+# Liste pour stocker les identifiants des e-mails déjà traités
+emails_traites = []
+
+def process_emails():
+    # Votre code pour la récupération des nouveaux e-mails
+    
+    for email in nouveaux_emails:
+        # Récupérer l'identifiant de l'e-mail
+        email_id = get_email_id(email)
+
+        # Vérifier si l'e-mail a déjà été traité
+        if email_id in emails_traites:
+            continue  # Ignorer l'e-mail car il a déjà été traité
+
+        # Vérifier si l'e-mail est indésirable
+        if is_email_indesirable(email):
+            continue  # Ignorer l'e-mail indésirable
+
+        # Traitement de l'e-mail
+        traiter_email(email)
+
+        # Ajouter l'identifiant de l'e-mail à la liste des e-mails traités
+        emails_traites.append(email_id)
+
+        # Autres actions à effectuer après le traitement de l'e-mail
+
+# Fonction pour récupérer l'identifiant de l'e-mail
+def get_email_id(email):
+    # Logique pour extraire l'identifiant de l'e-mail
+    # Retournez l'identifiant de l'e-mail
+
+# Fonction pour vérifier si l'e-mail est indésirable
+def is_email_indesirable(email):
+    sender = get_sender(email)
+    body = get_body(email)
+
+    # Logique pour vérifier si l'e-mail est indésirable
+    # Retournez True si l'e-mail est indésirable, False sinon
+
+# Fonction pour traiter l'e-mail
+def traiter_email(email):
+    # Votre logique de traitement de l'e-mail
+
+# Fonctions auxiliaires pour extraire les informations de l'e-mail
+def get_sender(email):
+    # Logique pour extraire l'expéditeur de l'e-mail
+    # Retournez l'adresse e-mail de l'expéditeur
+
+def get_body(email):
+    # Logique pour extraire le corps de l'e-mail
+    # Retournez le corps de l'e-mail
 
 # Récupérer les e-mails non lus
 emails = fetch_unread_emails(mailbox)
@@ -213,4 +287,3 @@ def process_emails():
         mail.logout()
 
 process_emails()
-
