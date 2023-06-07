@@ -92,9 +92,8 @@ while True:
 
 def extract_personal_info(body):
     nlp = spacy.load("fr_core_news_sm")
-    doc = nlp(body)
 
-    personal_info = {}
+    personal_info = {"Last Name": "", "First Name": ""}
 
     # Extraction du nom et du prénom
     for entity in doc.ents:
@@ -145,6 +144,7 @@ mailbox = connect_to_mailbox()
 
 # Liste pour stocker les identifiants des e-mails déjà traités
 emails_traites = []
+nouveaux_emails = []
 
 def process_emails():
     # Votre code pour la récupération des nouveaux e-mails
