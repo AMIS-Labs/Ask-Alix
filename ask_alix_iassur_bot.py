@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 
+import spacy
 import os
 import time
 import imaplib
 import email
-import spacy
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -91,7 +91,6 @@ while True:
     # Extraction du nom et du prénom
 
 def extract_personal_info(body):
-    soup = BeautifulSoup(body, "html.parser")
     nlp = spacy.load("fr_core_news_sm")
     doc = nlp(body)
 
@@ -102,10 +101,15 @@ def extract_personal_info(body):
         if entity.label_ == "PER":
             name_parts = entity.text.split()
             if len(name_parts) >= 2:
-                personal_info["Nom"] = name_parts[-1]  # Dernier élément du nom
-                personal_info["Prénom"] = " ".join(name_parts[:-1])  # Tous les éléments précédents
+                if "Nom" not in personal_info:
+                    personal_info["Nom"] = name_parts[-1]  # Dernier élément du nom
+                elif "Prénom" not in personal_info:
+                    personal_info["Prénom"] = " ".join(name_parts[:-1])  # Tous les éléments précédents
+                else:
+                    break
 
     return personal_info
+
 
     
     # Fonction pour se connecter à la boîte de réception
