@@ -31,15 +31,16 @@ OPENAI_MAX_TOKENS = 1024
 OPENAI_TOP_P = 1
 OPENAI_FREQUENCY_PENALTY = 0
 OPENAI_PRESENCE_PENALTY = 0.6
-PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance, générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances."
+PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance, générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la réponse nécéssite plus de spécification et/ou information pour être exacte et safisfaisante, tu dois formuler tes requêtes à l'expéditeur de l'email entrant. Une fois que tu as toutes les informations minimales nécéssaire à la formulation d'une réponse, tu génère cette réponse dans le respect des conditions indiquées. Tu ne dois jamais laisser l'interlocuteur rechercher par lui-même la réponse, tu dois lui fournir et si ce n'est pas possible, tu dois lui poser des questions afin de pouvoir mieux comprendre sa requête, l'affiner et lui fournir une réponse avec la plus forte probabilité d'exactitute. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances."
 
 # Délai de lecture de la boîte de réception (en secondes)
 CHECK_INTERVAL = 60
 
 # Variables pour personnaliser la réponse
 BOT_NAME = "Alix"
-INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par la société IASSUR dans le but de vous aider au sujet de vos assurances professionnelles."
+INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider au sujet de vos assurances professionnelles."
 POLITE_CLOSING = "N'hésitez pas à me poser d'autres questions. Je suis là pour vous aider."
+POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales. Il est donc toujours conseillé de vérifier les sources officielles à jour"
 
 def send_gmail(sender_address, receiver_address, mail_subject, mail_content):
     message = MIMEMultipart()
@@ -166,32 +167,23 @@ def process_emails():
 
 # Fonction pour récupérer l'identifiant de l'e-mail
 def get_email_id(email):
+        sender = get_sender(email)
+        body = get_body(email)
     # Logique pour extraire l'identifiant de l'e-mail
     # Retournez l'identifiant de l'e-mail
+        pass
 
 # Fonction pour vérifier si l'e-mail est indésirable
 def is_email_indesirable(email):
-    sender = get_sender(email)
-    body = get_body(email)
+    
+    if "noreply" in email:
+        return True
+    else:
+        return False
 
     # Logique pour vérifier si l'e-mail est indésirable
     # Retournez True si l'e-mail est indésirable, False sinon
 
-# Fonction pour traiter l'e-mail
-def traiter_email(email):
-    # Votre logique de traitement de l'e-mail
-
-# Fonctions auxiliaires pour extraire les informations de l'e-mail
-def get_sender(email):
-    # Logique pour extraire l'expéditeur de l'e-mail
-    # Retournez l'adresse e-mail de l'expéditeur
-
-def get_body(email):
-    # Logique pour extraire le corps de l'e-mail
-    # Retournez le corps de l'e-mail
-
-# Récupérer les e-mails non lus
-emails = fetch_unread_emails(mailbox)
 
 # Parcourir les e-mails et extraire les informations personnelles
 
@@ -243,7 +235,7 @@ def generate_prompt(sender_name, question):
     prompt = "Bonjour {},\n\n{}\n\n".format(sender_firstname, INTRODUCTION_SENTENCE)
     prompt += "J'ai bien reçu votre question : {}\n\n".format(question)
     prompt += "Je vais vous fournir une réponse dans les plus brefs délais.\n\n"
-    prompt += "Cordialement,\n"
+    prompt += "Au plaisir de collaborer avec vous,\n"
     prompt += "{}".format(BOT_NAME)
 
 
@@ -252,7 +244,7 @@ def generate_prompt(sender_name, question):
 def send_auto_reply(sender, subject, question, response):
     receiver = sender
     reply_subject = f"Re: {subject}"
-    reply_message = f"Bonjour {sender_firstname},\n\n{response}\n\n{POLITE_CLOSING}\n\nCordialement,\n{BOT_NAME}"
+    reply_message = f"Bonjour {sender_firstname},\n\n{response}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}n\n{POST_SCRIPTUM}"
 
     send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
 
