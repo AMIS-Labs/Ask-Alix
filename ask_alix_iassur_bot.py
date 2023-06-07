@@ -214,7 +214,7 @@ def process_emails():
 
 def generate_response(prompt, personal_info):
     # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
-    openai.api_key = OPENAI_SECRET_KEY
+    openai.api_key = os.environ["OPENAI_API_KEY"]
     response = openai.Completion.create(
         engine="text-davinci-003",
         prompt=PROMPT_TO_FOLLOW,
