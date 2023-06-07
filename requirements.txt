@@ -3,7 +3,7 @@ python-dotenv==1.0.0
 imapclient==2.3.0
 nltk==3.6.5
 numpy==1.21.2
-openai==0.31.0
+openai==0.27.8
 python-dateutil==2.8.2
 requests==2.26.0
 schedule==1.7.0
