@@ -235,15 +235,25 @@ def generate_response(prompt, personal_info):
 
 def generate_prompt(sender_name, question):
     # Générer le prompt pour OpenAI en fonction du nom de l'expéditeur et de la question
-    
+    prompt = "Bonjour"
+
+    sender_firstname = ""  # Valeur par défaut
+
+    # Vérifier si l'information a été extraite de l'e-mail
+    if "sender_firstname" in personal_info:
+        sender_firstname = personal_info["sender_firstname"]
+
+    # Utiliser la variable sender_firstname dans la génération de la réponse
     prompt = "Bonjour {},\n\n{}\n\n".format(sender_firstname, INTRODUCTION_SENTENCE)
+
+    prompt += "{}\n\n".format(INTRODUCTION_SENTENCE)
     prompt += "J'ai bien reçu votre question : {}\n\n".format(question)
     prompt += "Je vais vous fournir une réponse dans les plus brefs délais.\n\n"
     prompt += "Au plaisir de collaborer avec vous,\n"
     prompt += "{}".format(BOT_NAME)
 
-
     return prompt
+
 
 def send_auto_reply(sender, subject, question, response):
     receiver = sender
