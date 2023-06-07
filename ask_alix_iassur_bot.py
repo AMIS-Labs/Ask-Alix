@@ -10,7 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
-from dotenv import load_dotenv
+from python-dotenv import load_dotenv
 import openai
 import schedule
 import time
