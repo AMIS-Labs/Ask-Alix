@@ -11,7 +11,6 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-import re
 import requests
 import openai
 import schedule
