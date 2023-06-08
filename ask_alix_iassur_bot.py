@@ -264,8 +264,9 @@ def extract_linkedin_url_from_signature(signature):
     match = re.search(pattern, signature)
     if match:
         return match.group(1)
-
+    
     return None
+
 
 # Fonction pour obtenir le prénom à partir du nom complet
 def get_firstname(fullname):
