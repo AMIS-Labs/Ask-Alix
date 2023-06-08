@@ -127,8 +127,8 @@ def extract_info_from_email(email):
         name, job_title, company = extract_linkedin_profile_info(linkedin_url)
         if name and job_title and company:
             # Ajouter les informations extraites à personal_info
-            personal_info["Nom"] = name
-            personal_info["Prénom"] = get_firstname(name)
+            personal_info["Nom"] = lastname(name)
+            personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
     # Autres étapes d'extraction des informations de l'e-mail
@@ -138,13 +138,6 @@ def extract_info_from_email(email):
 def extract_signature_from_email(email):
     # Logique d'extraction de la signature de l'e-mail
     # ...
-
-# Fonction pour obtenir le prénom à partir du nom complet
-def get_firstname(fullname):
-    parts = fullname.split()
-    if len(parts) > 0:
-        return parts[0]
-    return ""
 
 # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
 def generate_response(prompt, personal_info):
