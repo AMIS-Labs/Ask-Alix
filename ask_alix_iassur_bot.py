@@ -11,6 +11,8 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+import re
+import requests
 import openai
 import schedule
 import time
@@ -39,6 +41,7 @@ CHECK_INTERVAL = 60
 # Variables pour personnaliser la réponse
 BOT_NAME = "Alix"
 INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider au sujet de vos assurances professionnelles."
+GREETING_SENTENCE = "J'espère que vous vous portez bien, je ferai mon maximum pour vous aider aujourd'hui !"
 POLITE_CLOSING = "N'hésitez pas à me poser d'autres questions. Je suis là pour vous aider."
 POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales. Il est donc toujours conseillé de vérifier les sources officielles à jour"
 
