@@ -214,6 +214,68 @@ def process_emails():
         print("---")
 
         return personal_info
+    
+    # Fonction pour extraire les informations du profil LinkedIn
+def extract_linkedin_profile_info(linkedin_url):
+    # Envoyer une requête GET pour récupérer le contenu de la page du profil LinkedIn
+    response = requests.get(linkedin_url)
+    if response.status_code == 200:
+        # Analyser le contenu de la page avec BeautifulSoup
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        # Extraire les informations du profil
+        name = soup.find("li", class_="inline t-24 t-black t-normal break-words").text.strip()
+        job_title = soup.find("h2", class_="mt1 t-18 t-black t-normal break-words").text.strip()
+        company = soup.find("h3", class_="t-16 t-black t-normal break-words").text.strip()
+
+        return name, job_title, company
+
+    return None, None, None
+
+# Fonction pour extraire les informations de la signature et du profil LinkedIn
+def extract_info_from_email(email):
+    # Analyser le contenu de l'e-mail et extraire la signature
+    signature = extract_signature_from_email(email)
+
+    # Rechercher un lien LinkedIn dans la signature
+    linkedin_url = extract_linkedin_url_from_signature(signature)
+
+    if linkedin_url:
+        # Extraire les informations du profil LinkedIn
+        name, job_title, company = extract_linkedin_profile_info(linkedin_url)
+        if name and job_title and company:
+            # Ajouter les informations extraites à personal_info
+            personal_info["Nom"] = name
+            personal_info["Prénom"] = get_firstname(name)
+            personal_info["Titre"] = job_title
+            personal_info["Entreprise"] = company
+
+    # Autres étapes d'extraction des informations de l'e-mail
+    # ...
+
+# Fonction pour extraire la signature de l'e-mail
+def extract_signature_from_email(email):
+    # Logique d'extraction de la signature de l'e-mail
+    # ...
+
+# Fonction pour extraire le lien LinkedIn de la signature
+def extract_linkedin_url_from_signature(signature):
+    # Recherche d'un lien LinkedIn dans la signature en utilisant des expressions régulières
+    pattern = r"(?i)\b(https?://(?:www\.)?linkedin\.com/\S+)\b"
+    match = re.search(pattern, signature)
+    if match:
+        return match.group(1)
+
+    return None
+
+# Fonction pour obtenir le prénom à partir du nom complet
+def get_firstname(fullname):
+    parts = fullname.split()
+    if len(parts) > 0:
+        return parts[0]
+
+    return ""
+
 
 def generate_response(prompt, personal_info):
     # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
