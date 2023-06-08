@@ -131,13 +131,7 @@ def extract_info_from_email(email):
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
-    # Autres étapes d'extraction des informations de l'e-mail
-    # ...
-
-# Fonction pour extraire la signature de l'e-mail
-def extract_signature_from_email(email):
-    # Logique d'extraction de la signature de l'e-mail
-    # ...
+    return name
 
 # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
 def generate_response(prompt, personal_info):
