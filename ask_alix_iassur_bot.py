@@ -267,7 +267,6 @@ def extract_linkedin_url_from_signature(signature):
     
     return None
 
-
 # Fonction pour obtenir le prénom à partir du nom complet
 def get_firstname(fullname):
     parts = fullname.split()
