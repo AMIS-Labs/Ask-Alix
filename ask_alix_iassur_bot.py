@@ -87,7 +87,7 @@ def fetch_unread_emails(mailbox):
     return emails
 
 # Fonction pour extraire les informations personnelles du corps de l'e-mail
-def extract_personal_info(body):
+def extract_personal_info_from_email_body(body):
     nlp = spacy.load("fr_core_news_sm")
     doc = nlp(body)
 
@@ -125,38 +125,155 @@ def extract_linkedin_profile_info(linkedin_url):
         return name, job_title, company
     return None, None, None
 
-# Fonction pour extraire les informations de la signature et du profil LinkedIn
-def extract_info_from_email(email, db_connection):
+# Fonction pour extraire les informations personnelles depuis l'e-mail, l'adresse e-mail et l'URL LinkedIn
+def extract_personal_info(email, body, db_connection):
+    personal_info = {}
+    
+    # Extraction depuis l'e-mail
+    personal_info_email = extract_personal_info_from_email_body(body)
+    personal_info.update(personal_info_email)
+    
+    # Extraction depuis l'adresse e-mail
+    email_address = email.get("From")
+    personal_info_email_address = extract_personal_info_from_email_address(email_address)
+    personal_info.update(personal_info_email_address)
+    
+    # Extraction depuis l'URL LinkedIn
     signature = extract_signature_from_email(email)
     linkedin_url = extract_linkedin_url_from_signature(signature)
     if linkedin_url:
         name, job_title, company = extract_linkedin_profile_info(linkedin_url)
         if name and job_title and company:
-            # Ajouter les informations extraites à personal_info
             personal_info["Nom"] = lastname(name)
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
-            # Enregistrer les données dans la base de données
-            save_interaction(email.get("ID"), personal_info, db_connection)
-    return name
+    
+    # Vérification des informations dans la base de données
+    if personal_info:
+        email_id = email.get("ID")
+        if not is_personal_info_present_in_database(email_id, db_connection):
+            # Enregistrement des informations dans la base de données
+            save_personal_info_to_database(email_id, personal_info, db_connection)
+    
+    return personal_info
 
-# Fonction pour enregistrer une interaction dans la base de données
-def save_interaction(email_id, personal_info, db_connection):
+# Fonction pour extraire les informations personnelles depuis l'adresse e-mail
+def extract_personal_info_from_email_address(email_address):
+    personal_info = {"Nom": "", "Prénom": ""}
+    parts = email_address.split("@")
+    if len(parts) >= 2:
+        name_parts = parts[0].split(".")
+        if len(name_parts) >= 2:
+            personal_info["Nom"] = name_parts[-1]
+            personal_info["Prénom"] = " ".join(name_parts[:-1])
+    return personal_info
+
+# Fonction pour rechercher l'URL LinkedIn à partir du nom, prénom et domaine de l'e-mail
+def search_linkedin_url(name, domain):
+    query = f"site:linkedin.com/in {name} {domain}"
+    user_agent = get_random_user_agent()
+    for url in search(query, num_results=5, user_agent=user_agent):
+        if "linkedin.com/in" in url:
+            return url
+    return None
+
+# Fonction pour extraire les informations depuis l'URL LinkedIn
+def extract_personal_info_from_linkedin(url):
+    personal_info = {}
+    response = requests.get(url)
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.content, "html.parser")
+        name_element = soup.find("li", class_="inline t-24 t-black t-normal break-words")
+        job_title_element = soup.find("h2", class_="mt1 t-18 t-black t-normal break-words")
+        company_element = soup.find("h3", class_="t-16 t-black t-normal break-words")
+        if name_element:
+            name = name_element.text.strip()
+            personal_info["Nom"] = lastname(name)
+            personal_info["Prénom"] = firstname(name)
+        if job_title_element:
+            personal_info["Titre"] = job_title_element.text.strip()
+        if company_element:
+            personal_info["Entreprise"] = company_element.text.strip()
+    return personal_info
+
+# Fonction pour extraire les informations personnelles en recherchant sur Bing ou Google
+def extract_personal_info_from_search(name, domain):
+    personal_info = {}
+    search_query = f'"{name}" "{domain}" site:linkedin.com/in'
+    user_agent = get_random_user_agent()
+    for url in search(search_query, num_results=5, user_agent=user_agent):
+        if "linkedin.com/in" in url:
+            personal_info = extract_personal_info_from_linkedin(url)
+            break
+    return personal_info
+
+# Fonction principale pour extraire les informations personnelles
+def extract_personal_info(email, body, db_connection):
+    personal_info = {}
+    
+    # Vérification dans la base de données
+    email_id = email.get("ID")
+    personal_info = get_personal_info_from_database(email_id, db_connection)
+    if personal_info:
+        return personal_info
+    
+    # Extraction depuis l'e-mail
+    personal_info_email = extract_personal_info_from_email_body(body)
+    personal_info.update(personal_info_email)
+    
+    # Extraction depuis l'adresse e-mail
+    email_address = email.get("From")
+    personal_info_email_address = extract_personal_info_from_email_address(email_address)
+    personal_info.update(personal_info_email_address)
+    
+    # Extraction depuis l'URL LinkedIn
+    signature = extract_signature_from_email(email)
+    linkedin_url = extract_linkedin_url_from_signature(signature)
+    if linkedin_url:
+        name, job_title, company = extract_linkedin_profile_info(linkedin_url)
+        if name and job_title and company:
+            personal_info["Nom"] = lastname(name)
+            personal_info["Prénom"] = firstname(name)
+            personal_info["Titre"] = job_title
+            personal_info["Entreprise"] = company
+    
+    # Vérification des informations dans la base de données
+    if personal_info:
+        email_id = email.get("ID")
+        if not is_personal_info_present_in_database(email_id, db_connection):
+            # Enregistrement des informations dans la base de données
+            save_personal_info_to_database(email_id, personal_info, db_connection)
+    
+    # Vérification des informations sur LinkedIn en effectuant une recherche
+    if not personal_info.get("Nom") and not personal_info.get("Prénom"):
+        name = personal_info.get("Nom") or personal_info.get("Prénom")
+        domain = email_address.split("@")[-1]
+        if name and domain:
+            personal_info_search = extract_personal_info_from_search(name, domain)
+            personal_info.update(personal_info_search)
+    
+    return personal_info
+
+# Fonction pour vérifier si les informations personnelles sont présentes dans la base de données
+def is_personal_info_present_in_database(email_id, db_connection):
     cursor = db_connection.cursor()
-    cursor.execute(
-        "INSERT INTO interactions (email_id, personal_info) VALUES (?, ?)",
-        (email_id, json.dumps(personal_info))
-    )
+    cursor.execute("SELECT personal_info FROM interactions WHERE email_id = ?", (email_id,))
+    data = cursor.fetchone()
+    if data:
+        return True
+    return False
+
+# Fonction pour enregistrer les informations personnelles dans la base de données
+def save_personal_info_to_database(email_id, personal_info, db_connection):
+    cursor = db_connection.cursor()
+    cursor.execute("INSERT INTO interactions (email_id, personal_info) VALUES (?, ?)", (email_id, json.dumps(personal_info)))
     db_connection.commit()
 
-# Fonction pour récupérer les données précédentes d'un interlocuteur depuis la base de données
-def get_previous_interaction_data(email_id, db_connection):
+# Fonction pour récupérer les informations personnelles depuis la base de données
+def get_personal_info_from_database(email_id, db_connection):
     cursor = db_connection.cursor()
-    cursor.execute(
-        "SELECT personal_info FROM interactions WHERE email_id = ?",
-        (email_id,)
-    )
+    cursor.execute("SELECT personal_info FROM interactions WHERE email_id = ?", (email_id,))
     data = cursor.fetchone()
     if data:
         return json.loads(data[0])
