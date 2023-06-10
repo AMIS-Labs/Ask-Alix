@@ -14,6 +14,11 @@ from dotenv import load_dotenv
 import requests
 import openai
 import schedule
+import sqlite3
+import json
+import re
+from googlesearch import search
+from googlesearch import get_random_user_agent
 
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
@@ -21,6 +26,7 @@ EMAIL_ADDRESS = "questions-alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "cvyolriqdmaehgeu"
 IMAP_SERVER = "imap.gmail.com"
 PASSWORD = "cvyolriqdmaehgeu"
+sender_address = "questions-alix@iassurpro.com"
 
 # Clé secrète OpenAI
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -31,17 +37,17 @@ OPENAI_MAX_TOKENS = 1024
 OPENAI_TOP_P = 1
 OPENAI_FREQUENCY_PENALTY = 0
 OPENAI_PRESENCE_PENALTY = 0.6
-PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance, générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la réponse nécéssite plus de spécification et/ou information pour être exacte et safisfaisante, tu dois formuler tes requêtes à l'expéditeur de l'email entrant. Une fois que tu as toutes les informations minimales nécéssaire à la formulation d'une réponse, tu génère cette réponse dans le respect des conditions indiquées. Tu ne dois jamais laisser l'interlocuteur rechercher par lui-même la réponse, tu dois lui fournir et si ce n'est pas possible, tu dois lui poser des questions afin de pouvoir mieux comprendre sa requête, l'affiner et lui fournir une réponse avec la plus forte probabilité d'exactitute. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances."
+PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance : Générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la réponse nécéssite plus de spécification et/ou information pour être exacte et safisfaisante, tu dois formuler tes requêtes à l'expéditeur de l'email entrant. Une fois que tu as toutes les informations minimales nécéssaire à la formulation d'une réponse, tu génère cette réponse dans le respect des conditions indiquées. Tu ne dois jamais laisser l'interlocuteur rechercher par lui-même la réponse, tu dois lui fournir une réponse complète et pédagogique. Tu t'adresses à de parfaits novices sur le sujet. Si la question ne semble pas claire, tu dois lui poser des questions afin de pouvoir mieux comprendre sa requête, l'affiner et lui fournir une réponse avec la plus forte probabilité d'exactitute. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, cependant, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances professionnelles."
 
 # Délai de lecture de la boîte de réception (en secondes)
 CHECK_INTERVAL = 60
 
 # Variables pour personnaliser la réponse
 BOT_NAME = "Alix"
-INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider au sujet de vos assurances professionnelles."
-GREETING_SENTENCE = "J'espère que vous vous portez bien, je ferai mon maximum pour vous aider aujourd'hui !"
+INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider à mieux comprendre le sujet des assurances professionnelles."
+GREETING_SENTENCE = "Je suis ravi de vous revoir, j'espère que vous vous portez bien! Je ferai de mon mieux pour vous aider aujourd'hui !"
 POLITE_CLOSING = "N'hésitez pas à me poser d'autres questions. Je suis là pour vous aider."
-POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales. Il est donc toujours conseillé de vérifier les sources officielles à jour."
+POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales. Il est donc toujours conseillé de vérifier les sources officielles à jour et consulter votre expert IASSUR pour un accompagnement approfondi."
 
 # Fonction pour envoyer un e-mail Gmail
 def send_gmail(sender_address, receiver_address, mail_subject, mail_content):
@@ -120,7 +126,7 @@ def extract_linkedin_profile_info(linkedin_url):
     return None, None, None
 
 # Fonction pour extraire les informations de la signature et du profil LinkedIn
-def extract_info_from_email(email):
+def extract_info_from_email(email, db_connection):
     signature = extract_signature_from_email(email)
     linkedin_url = extract_linkedin_url_from_signature(signature)
     if linkedin_url:
@@ -131,7 +137,30 @@ def extract_info_from_email(email):
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
+            # Enregistrer les données dans la base de données
+            save_interaction(email.get("ID"), personal_info, db_connection)
     return name
+
+# Fonction pour enregistrer une interaction dans la base de données
+def save_interaction(email_id, personal_info, db_connection):
+    cursor = db_connection.cursor()
+    cursor.execute(
+        "INSERT INTO interactions (email_id, personal_info) VALUES (?, ?)",
+        (email_id, json.dumps(personal_info))
+    )
+    db_connection.commit()
+
+# Fonction pour récupérer les données précédentes d'un interlocuteur depuis la base de données
+def get_previous_interaction_data(email_id, db_connection):
+    cursor = db_connection.cursor()
+    cursor.execute(
+        "SELECT personal_info FROM interactions WHERE email_id = ?",
+        (email_id,)
+    )
+    data = cursor.fetchone()
+    if data:
+        return json.loads(data[0])
+    return None
 
 # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
 def generate_response(prompt, personal_info):
@@ -150,12 +179,11 @@ def generate_response(prompt, personal_info):
     return generated_text
 
 # Générer le prompt pour OpenAI en fonction du nom de l'expéditeur et de la question
-
 def generate_prompt(sender_name, question):
     prompt = ""
 
     # Vérifier si le destinataire a déjà reçu un premier email de l'adresse d'expédition
-    if has_received_first_email(sender_name):
+    if has_received_first_email(sender_name, db_connection):
         prompt += "{}\n\n".format(GREETING_SENTENCE)
         prompt += "J'ai bien reçu votre question : {}\n\n".format(question)
         prompt += "Je vais vous fournir une réponse dans les plus brefs délais.\n\n"
@@ -171,7 +199,6 @@ def generate_prompt(sender_name, question):
 
     return prompt
 
-
 # Envoyer une réponse automatique à l'expéditeur
 def send_auto_reply(sender, subject, question, response):
     receiver = sender
@@ -180,13 +207,18 @@ def send_auto_reply(sender, subject, question, response):
     send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
 
 # Fonction principale pour traiter les e-mails
-def process_emails():
+def process_emails(db_connection):
     mailbox = connect_to_mailbox()
     unread_emails = fetch_unread_emails(mailbox)
 
     for email in unread_emails:
         sender, subject, body = process_email(email)
         personal_info = extract_personal_info(body)
+        email_id = email.get("ID")
+        previous_data = get_previous_interaction_data(email_id, db_connection)
+        if previous_data:
+            # Utiliser les données précédentes pour personnaliser la réponse
+            personal_info.update(previous_data)
         prompt = generate_prompt(personal_info["Prénom"], body)
         response = generate_response(prompt, personal_info)
         send_auto_reply(sender, subject, body, response)
@@ -197,9 +229,22 @@ def process_emails():
     mailbox.logout()
 
 # Planifier l'exécution du traitement des e-mails toutes les CHECK_INTERVAL secondes
-schedule.every(CHECK_INTERVAL).seconds.do(process_emails)
+schedule.every(CHECK_INTERVAL).seconds.do(process_emails, db_connection)
 
 # Boucle d'exécution principale
-while True:
-    schedule.run_pending()
-    time.sleep(1)
+if __name__ == "__main__":
+    # Connexion à la base de données
+    db_connection = sqlite3.connect("AskAlixMemory.db")
+    cursor = db_connection.cursor()
+
+    # Création de la table interactions si elle n'existe pas déjà
+    cursor.execute(
+        "CREATE TABLE IF NOT EXISTS interactions (email_id TEXT PRIMARY KEY, personal_info TEXT)"
+    )
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+    # Fermeture de la connexion à la base de données
+    db_connection.close()
