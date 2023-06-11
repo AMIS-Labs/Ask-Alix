@@ -26,7 +26,7 @@ EMAIL_ADDRESS = "questions-alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "cvyolriqdmaehgeu"
 IMAP_SERVER = "imap.gmail.com"
 PASSWORD = "cvyolriqdmaehgeu"
-sender_address = "questions-alix@iassurpro.com"
+SENDER_ADRESS = "questions-alix@iassurpro.com"
 
 # Clé secrète OpenAI
 openai.api_key = os.environ["OPENAI_API_KEY"]
@@ -245,6 +245,8 @@ def extract_personal_info(email, body, db_connection):
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
+            personal_info["Ville"] = city
+            personal_info["Pays"] = country
     
     # Vérification des informations dans la base de données
     if personal_info:
