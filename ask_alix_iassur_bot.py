@@ -105,6 +105,7 @@ def extract_personal_info_from_email_body(body):
                     break
 
     return personal_info
+pass
 
 # Fonction pour extraire le lien LinkedIn de la signature
 def extract_linkedin_url_from_signature(signature):
@@ -113,6 +114,7 @@ def extract_linkedin_url_from_signature(signature):
     if match:
         return match.group(1)
     return None
+pass
 
 # Fonction pour extraire les informations du profil LinkedIn
 def extract_linkedin_profile_info(linkedin_url):
@@ -124,6 +126,7 @@ def extract_linkedin_profile_info(linkedin_url):
         company = soup.find("h3", class_="t-16 t-black t-normal break-words").text.strip()
         return name, job_title, company
     return None, None, None
+pass
 
 # Fonction pour extraire les informations personnelles depuis l'e-mail, l'adresse e-mail et l'URL LinkedIn
 def extract_personal_info(email, body, db_connection):
@@ -157,6 +160,7 @@ def extract_personal_info(email, body, db_connection):
             save_personal_info_to_database(email_id, personal_info, db_connection)
     
     return personal_info
+pass
 
 # Fonction pour extraire les informations personnelles depuis l'adresse e-mail
 def extract_personal_info_from_email_address(email_address):
@@ -168,6 +172,7 @@ def extract_personal_info_from_email_address(email_address):
             personal_info["Nom"] = name_parts[-1]
             personal_info["Prénom"] = " ".join(name_parts[:-1])
     return personal_info
+pass
 
 # Fonction pour rechercher l'URL LinkedIn à partir du nom, prénom et domaine de l'e-mail
 def search_linkedin_url(name, domain):
@@ -177,6 +182,7 @@ def search_linkedin_url(name, domain):
         if "linkedin.com/in" in url:
             return url
     return None
+pass
 
 # Fonction pour extraire les informations depuis l'URL LinkedIn
 def extract_personal_info_from_linkedin(url):
@@ -196,6 +202,7 @@ def extract_personal_info_from_linkedin(url):
         if company_element:
             personal_info["Entreprise"] = company_element.text.strip()
     return personal_info
+pass
 
 # Fonction pour extraire les informations personnelles en recherchant sur Bing ou Google
 def extract_personal_info_from_search(name, domain):
@@ -207,6 +214,7 @@ def extract_personal_info_from_search(name, domain):
             personal_info = extract_personal_info_from_linkedin(url)
             break
     return personal_info
+pass
 
 # Fonction principale pour extraire les informations personnelles
 def extract_personal_info(email, body, db_connection):
@@ -254,6 +262,7 @@ def extract_personal_info(email, body, db_connection):
             personal_info.update(personal_info_search)
     
     return personal_info
+pass
 
 # Fonction pour vérifier si les informations personnelles sont présentes dans la base de données
 def is_personal_info_present_in_database(email_id, db_connection):
@@ -263,6 +272,7 @@ def is_personal_info_present_in_database(email_id, db_connection):
     if data:
         return True
     return False
+pass
 
 # Fonction pour enregistrer les informations personnelles dans la base de données
 def save_personal_info_to_database(email_id, personal_info, db_connection):
@@ -278,6 +288,7 @@ def get_personal_info_from_database(email_id, db_connection):
     if data:
         return json.loads(data[0])
     return None
+pass
 
 # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
 def generate_response(prompt, personal_info):
