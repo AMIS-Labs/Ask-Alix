@@ -28,6 +28,44 @@ IMAP_SERVER = "imap.gmail.com"
 PASSWORD = "cvyolriqdmaehgeu"
 SENDER_ADRESS = "questions-alix@iassurpro.com"
 
+# Nom de la base de données SQLite
+DATABASE_NAME = "AskAlixMemory"
+DATABASE_FILE = "AskAlixMemory.db"
+
+# Chemin d'accès à la base de données SQLite
+DATABASE_PATH = "/Users/wagceo/AskAlixMemory.db"
+
+# Établir la connexion à la base de données
+db_connection = sqlite3.connect(DATABASE_PATH)
+
+# Créer la table avec les colonnes appropriées
+db_connection.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        firstname TEXT,
+        lastname TEXT,
+        location TEXT,
+        jobtitle TEXT,
+        city TEXT,
+        country TEXT
+    )
+''')
+
+# Insérer les données dans la table
+data = {
+    'firstname': 'John',
+    'lastname': 'Doe',
+    'location': 'Paris',
+    'jobtitle': 'Engineer',
+    'city': 'Paris',
+    'country': 'France'
+}
+
+db_connection.execute('''
+    INSERT INTO users (firstname, lastname, location, jobtitle, city, country)
+    VALUES (:firstname, :lastname, :location, :jobtitle, :city, :country)
+''', data)
+
 # Clé secrète OpenAI
 openai.api_key = os.environ["OPENAI_API_KEY"]
 
@@ -37,7 +75,7 @@ OPENAI_MAX_TOKENS = 1024
 OPENAI_TOP_P = 1
 OPENAI_FREQUENCY_PENALTY = 0
 OPENAI_PRESENCE_PENALTY = 0.6
-PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance : Générer une réponse clair et pégagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la réponse nécéssite plus de spécification et/ou information pour être exacte et safisfaisante, tu dois formuler tes requêtes à l'expéditeur de l'email entrant. Une fois que tu as toutes les informations minimales nécéssaire à la formulation d'une réponse, tu génère cette réponse dans le respect des conditions indiquées. Tu ne dois jamais laisser l'interlocuteur rechercher par lui-même la réponse, tu dois lui fournir une réponse complète et pédagogique. Tu t'adresses à de parfaits novices sur le sujet. Si la question ne semble pas claire, tu dois lui poser des questions afin de pouvoir mieux comprendre sa requête, l'affiner et lui fournir une réponse avec la plus forte probabilité d'exactitute. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, cependant, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances professionnelles."
+PROMPT_TO_FOLLOW = "Analyser l'objet de l'e-mail, puis analyser le corps de l'e-mail. Si la question concerne le sujet de l'assurance : Générer une réponse claire et pédagogique ; Décrire précisément les jargons, accronymes et termes techniques comme si tu l'expliquais à un enfant. Si la réponse nécéssite plus de spécification et/ou information pour être exacte et safisfaisante, tu dois formuler tes requêtes à l'expéditeur de l'email entrant. Une fois que tu as toutes les informations minimales nécéssaire à la formulation d'une réponse, tu génère cette réponse dans le respect des conditions indiquées. Tu ne dois jamais laisser l'interlocuteur rechercher par lui-même la réponse, tu dois lui fournir une réponse complète et pédagogique. Tu t'adresses à de parfaits novices sur le sujet. Si la question ne semble pas claire, tu dois lui poser des questions afin de pouvoir mieux comprendre sa requête, l'affiner et lui fournir une réponse avec la plus forte probabilité d'exactitute. Si la question ne concerne pas le sujet de l'assurance, tu dois répondre obligatoirement ceci : Bonjour {sender_firstname},\n\n{INTRODUCTION_SENTENCE}, cependant, je ne suis pas conçue pour répondre aux questions autres que celles concernant les assurances professionnelles."
 
 # Délai de lecture de la boîte de réception (en secondes)
 CHECK_INTERVAL = 60
@@ -151,6 +189,8 @@ def extract_personal_info(email, body, db_connection):
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
+            personal_info["Ville"] = city
+            personal_info["Pays"] = country
     
     # Vérification des informations dans la base de données
     if personal_info:
