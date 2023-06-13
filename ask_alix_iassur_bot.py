@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-
-import spacy
 import os
 import time
 import imaplib
@@ -15,7 +12,6 @@ import requests
 import openai
 import schedule
 import sqlite3
-import json
 import re
 from googlesearch import search
 from googlesearch import get_random_user_agent
@@ -37,6 +33,19 @@ DATABASE_PATH = "/Users/wagceo/AskAlixMemory.db"
 
 # Établir la connexion à la base de données
 db_connection = sqlite3.connect(DATABASE_PATH)
+
+# Données liés au destinataire
+RECEIVER_ADRESS = email_id
+EMAIL_ID = extract_email_id(EMAIL_ADDRESS)
+
+# Fonction pour extraire l'adresse e-mail à partir de l'e-mail entrant
+def extract_email_address(email):
+    return email.get("From")
+
+# Utilisation de la fonction pour extraire l'adresse e-mail
+email_id = extract_email_address(email)
+print("Email address:", email_id)
+
 
 # Créer la table avec les colonnes appropriées
 db_connection.execute('''
@@ -135,15 +144,11 @@ def extract_personal_info_from_email_body(body):
         if entity.label_ == "PER":
             name_parts = entity.text.split()
             if len(name_parts) >= 2:
-                if "Nom" not in personal_info:
-                    personal_info["Nom"] = name_parts[-1]
-                elif "Prénom" not in personal_info:
-                    personal_info["Prénom"] = " ".join(name_parts[:-1])
-                else:
-                    break
+                personal_info["Nom"] = name_parts[-1]
+                personal_info["Prénom"] = " ".join(name_parts[:-1])
+                break
 
     return personal_info
-pass
 
 # Fonction pour extraire le lien LinkedIn de la signature
 def extract_linkedin_url_from_signature(signature):
@@ -152,7 +157,6 @@ def extract_linkedin_url_from_signature(signature):
     if match:
         return match.group(1)
     return None
-pass
 
 # Fonction pour extraire les informations du profil LinkedIn
 def extract_linkedin_profile_info(linkedin_url):
@@ -164,11 +168,16 @@ def extract_linkedin_profile_info(linkedin_url):
         company = soup.find("h3", class_="t-16 t-black t-normal break-words").text.strip()
         return name, job_title, company
     return None, None, None
-pass
 
 # Fonction pour extraire les informations personnelles depuis l'e-mail, l'adresse e-mail et l'URL LinkedIn
 def extract_personal_info(email, body, db_connection):
     personal_info = {}
+    
+    # Vérification dans la base de données
+    email_id = email.get("ID")
+    personal_info = get_personal_info_from_database(email_id, db_connection)
+    if personal_info:
+        return personal_info
     
     # Extraction depuis l'e-mail
     personal_info_email = extract_personal_info_from_email_body(body)
@@ -185,12 +194,11 @@ def extract_personal_info(email, body, db_connection):
     if linkedin_url:
         name, job_title, company = extract_linkedin_profile_info(linkedin_url)
         if name and job_title and company:
-            personal_info["Nom"] = lastname(name)
+            personal_info["Nom"] = name
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
-            personal_info["Ville"] = city
-            personal_info["Pays"] = country
+            personal_info["Ville"], personal_info["Pays"] = extract_location_info(linkedin_url)
     
     # Vérification des informations dans la base de données
     if personal_info:
@@ -200,7 +208,44 @@ def extract_personal_info(email, body, db_connection):
             save_personal_info_to_database(email_id, personal_info, db_connection)
     
     return personal_info
-pass
+
+
+# Fonction pour enregistrer les informations personnelles dans la base de données
+def save_personal_info_to_database(email_id, personal_info, db_connection):
+    db_connection.execute('''
+        INSERT INTO users (id, firstname, lastname, location, jobtitle, city, country)
+        VALUES (:id, :firstname, :lastname, :location, :jobtitle, :city, :country)
+    ''', {"id": email_id, "firstname": personal_info.get("Prénom"), "lastname": personal_info.get("Nom"),
+          "location": personal_info.get("Lieu"), "jobtitle": personal_info.get("Titre"),
+          "city": personal_info.get("Ville"), "country": personal_info.get("Pays")})
+    db_connection.commit()
+
+# Fonction pour vérifier si les informations personnelles sont présentes dans la base de données
+def is_personal_info_present_in_database(email_id, db_connection):
+    cursor = db_connection.cursor()
+    cursor.execute('''
+        SELECT COUNT(*) FROM users WHERE id = :id
+    ''', {"id": email_id})
+    count = cursor.fetchone()[0]
+    return count > 0
+
+# Fonction pour récupérer les informations personnelles depuis la base de données
+def get_personal_info_from_database(email_id, db_connection):
+    cursor = db_connection.cursor()
+    cursor.execute('''
+        SELECT firstname, lastname, location, jobtitle, city, country FROM users WHERE id = :id
+    ''', {"id": email_id})
+    row = cursor.fetchone()
+    if row:
+        return {
+            "Prénom": row[0],
+            "Nom": row[1],
+            "Lieu": row[2],
+            "Titre": row[3],
+            "Ville": row[4],
+            "Pays": row[5]
+        }
+    return None
 
 # Fonction pour extraire les informations personnelles depuis l'adresse e-mail
 def extract_personal_info_from_email_address(email_address):
@@ -212,17 +257,15 @@ def extract_personal_info_from_email_address(email_address):
             personal_info["Nom"] = name_parts[-1]
             personal_info["Prénom"] = " ".join(name_parts[:-1])
     return personal_info
-pass
 
 # Fonction pour rechercher l'URL LinkedIn à partir du nom, prénom et domaine de l'e-mail
-def search_linkedin_url(name, domain):
+def search_linkedin_url(firstname, lastname, domain):
     query = f"site:linkedin.com/in {name} {domain}"
     user_agent = get_random_user_agent()
     for url in search(query, num_results=5, user_agent=user_agent):
         if "linkedin.com/in" in url:
             return url
     return None
-pass
 
 # Fonction pour extraire les informations depuis l'URL LinkedIn
 def extract_personal_info_from_linkedin(url):
@@ -235,17 +278,16 @@ def extract_personal_info_from_linkedin(url):
         company_element = soup.find("h3", class_="t-16 t-black t-normal break-words")
         if name_element:
             name = name_element.text.strip()
-            personal_info["Nom"] = lastname(name)
+            personal_info["Nom"] = name
             personal_info["Prénom"] = firstname(name)
         if job_title_element:
             personal_info["Titre"] = job_title_element.text.strip()
         if company_element:
             personal_info["Entreprise"] = company_element.text.strip()
     return personal_info
-pass
 
 # Fonction pour extraire les informations personnelles en recherchant sur Bing ou Google
-def extract_personal_info_from_search(name, domain):
+def extract_personal_info_from_search(firstname, lastname, domain):
     personal_info = {}
     search_query = f'"{name}" "{domain}" site:linkedin.com/in'
     user_agent = get_random_user_agent()
@@ -254,7 +296,6 @@ def extract_personal_info_from_search(name, domain):
             personal_info = extract_personal_info_from_linkedin(url)
             break
     return personal_info
-pass
 
 # Fonction principale pour extraire les informations personnelles
 def extract_personal_info(email, body, db_connection):
@@ -281,12 +322,11 @@ def extract_personal_info(email, body, db_connection):
     if linkedin_url:
         name, job_title, company = extract_linkedin_profile_info(linkedin_url)
         if name and job_title and company:
-            personal_info["Nom"] = lastname(name)
+            personal_info["Nom"] = name
             personal_info["Prénom"] = firstname(name)
             personal_info["Titre"] = job_title
             personal_info["Entreprise"] = company
-            personal_info["Ville"] = city
-            personal_info["Pays"] = country
+            personal_info["Ville"], personal_info["Pays"] = extract_location_info(linkedin_url)
     
     # Vérification des informations dans la base de données
     if personal_info:
@@ -304,7 +344,6 @@ def extract_personal_info(email, body, db_connection):
             personal_info.update(personal_info_search)
     
     return personal_info
-pass
 
 # Fonction pour vérifier si les informations personnelles sont présentes dans la base de données
 def is_personal_info_present_in_database(email_id, db_connection):
@@ -314,23 +353,183 @@ def is_personal_info_present_in_database(email_id, db_connection):
     if data:
         return True
     return False
-pass
+
+
+# Fonction pour analyser l'adresse email et définir le firstname et le lastname
+def extract_name_from_email(email_id):
+    structures = [
+        "firstname.lastname",
+        "firstname_lastname",
+        "lastname.firstname",
+        "lastname_firstname",
+        "firstinitial.lastname",
+        "firstinitial_lastname",
+        "lastname.firstinitial",
+        "lastname_firstinitial",
+        "firstname",
+        "lastname",
+        "firstinitial",
+        "firstnamelastname",
+        "lastinitial",
+        "firstname_lastname_initial",
+        "firstname.lastinitial",
+        "firstname_lastinitial",
+        "firstinitial_lastname_initial",
+        "firstinitial_lastname.lastinitial",
+        "firstinitial_lastname_lastinitial",
+        "lastname.firstinitial",
+        "lastname.firstinitial_lastinitial",
+        "lastname_firstinitial_lastinitial",
+        "lastname.firstinitial_lastinitial",
+    ]
+
+   for structure in structures:
+        parts = re.split(r"\W", structure)
+        parts = [part.lower() for part in parts if part != ""]
+        pattern = parts[0] + r"\." + parts[1] + r"@\w+"
+        match = re.match(pattern, email_id)
+        if match:
+            firstname = match.group(1).capitalize()
+            lastname = match.group(2).capitalize()
+            return firstname, lastname
+
+    return None, None
+
+    # Méthode 1: Extraction depuis l'adresse e-mail (si possible)
+    parts = re.split(r"\W", email_id)
+    parts = [part.lower() for part in parts if part != ""]
+    if len(parts) >= 2:
+        firstname = parts[0].capitalize()
+        lastname = parts[1].capitalize()
+
+    # Méthode 2: Extraction depuis la signature (si disponible)
+    if signature:
+        name_parts = signature.split()
+        if len(name_parts) >= 2:
+            extracted_firstname = name_parts[0].capitalize()
+            extracted_lastname = name_parts[-1].capitalize()
+
+            if firstname is None:
+                firstname = extracted_firstname
+            elif firstname != extracted_firstname:
+                firstname = None
+                lastname = None
+
+            if lastname is None:
+                lastname = extracted_lastname
+            elif lastname != extracted_lastname:
+                firstname = None
+                lastname = None
+
+    # Méthode 3: Extraction depuis le compte LinkedIn (si disponible)
+    if linkedin_url:
+        name, _ = extract_name_from_linkedin(linkedin_url)
+        if name:
+            name_parts = name.split()
+            if len(name_parts) >= 2:
+                extracted_firstname = name_parts[0].capitalize()
+                extracted_lastname = name_parts[-1].capitalize()
+
+                if firstname is None:
+                    firstname = extracted_firstname
+                elif firstname != extracted_firstname:
+                    firstname = None
+                    lastname = None
+
+                if lastname is None:
+                    lastname = extracted_lastname
+                elif lastname != extracted_lastname:
+                    firstname = None
+                    lastname = None
+
+    return firstname, lastname
+
+def extract_personal_info_from_email(email):
+    body = get_email_body(email)
+    signature = extract_signature_from_email(email)
+    linkedin_url = extract_linkedin_url_from_email(email)
+    firstname, lastname = extract_name_from_email(email["From"], signature, linkedin_url)
+
+    if firstname and lastname:
+        personal_info = {
+            "Firstname": firstname,
+            "Lastname": lastname,
+        }
+    else:
+        personal_info = {
+            "Firstname": None,
+            "Lastname": None,
+        }
+
+    return personal_info
+
+
+def process_email(email):
+    sender = email["From"]
+    subject = email["Subject"]
+    body = get_email_body(email)
+    return sender, subject, body
+
+def get_email_body(email):
+    body = ""
+
+    if email.is_multipart():
+        for part in email.walk():
+            content_type = part.get_content_type()
+            if content_type == "text/plain":
+                body = part.get_payload(decode=True).decode("utf-8")
+                break
+    else:
+        body = email.get_payload(decode=True).decode("utf-8")
+
+    return body
+
+def extract_signature_from_email(email):
+    body = get_email_body(email)
+    # Extraction de la signature depuis le corps de l'e-mail
+    signature = re.search(r"--\n(.*)", body, re.DOTALL)
+    if signature:
+        return signature.group(1).strip()
+    return None
+
+def extract_linkedin_url_from_email(email):
+    signature = extract_signature_from_email(email)
+    if signature:
+        # Extraction de l'URL LinkedIn depuis la signature
+        linkedin_url = re.search(r"linkedin\.com/.*", signature, re.IGNORECASE)
+        if linkedin_url:
+            return linkedin_url.group().strip()
+    return None
+
+def extract_name_from_linkedin(linkedin_url):
+    # Extraction du nom depuis l'URL LinkedIn
+    # ...
+    return firstname, lastname
+
+def is_personal_info_valid(personal_info):
+    firstname = personal_info["Firstname"]
+    lastname = personal_info["Lastname"]
+    if firstname and lastname:
+        # Vérification de la validité des informations
+        return True
+    return False
+
+def process_question(email):
+    personal_info = extract_personal_info_from_email(email)
+
+    if is_personal_info_valid(personal_info):
+        question = get_question_from_email(email)
+        response = generate_response(question, personal_info)
+        send_response_email(email, response)
+    else:
+        response = question_personal_infos()
+        send_personal_info_question(email, response)
 
 # Fonction pour enregistrer les informations personnelles dans la base de données
 def save_personal_info_to_database(email_id, personal_info, db_connection):
     cursor = db_connection.cursor()
     cursor.execute("INSERT INTO interactions (email_id, personal_info) VALUES (?, ?)", (email_id, json.dumps(personal_info)))
     db_connection.commit()
-
-# Fonction pour récupérer les informations personnelles depuis la base de données
-def get_personal_info_from_database(email_id, db_connection):
-    cursor = db_connection.cursor()
-    cursor.execute("SELECT personal_info FROM interactions WHERE email_id = ?", (email_id,))
-    data = cursor.fetchone()
-    if data:
-        return json.loads(data[0])
-    return None
-pass
 
 # Générer la réponse en utilisant OpenAI en fonction du prompt et des informations personnelles
 def generate_response(prompt, personal_info):
@@ -371,12 +570,11 @@ def generate_prompt(sender_name, question):
 
 # Envoyer une réponse automatique à l'expéditeur
 def send_auto_reply(sender, subject, question, response):
-    receiver = sender
+    receiver_email = email_id
     reply_subject = f"Re: {subject}"
     reply_message = f"Bonjour {personal_info['Prénom']},\n\n{response}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n{POST_SCRIPTUM}"
     send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
 
-# Fonction principale pour traiter les e-mails
 def process_emails(db_connection):
     mailbox = connect_to_mailbox()
     unread_emails = fetch_unread_emails(mailbox)
@@ -393,6 +591,9 @@ def process_emails(db_connection):
         response = generate_response(prompt, personal_info)
         send_auto_reply(sender, subject, body, response)
 
+        # Enregistrer l'interaction dans la base de données
+        save_interaction_to_database(email_id, personal_info, response, db_connection)
+
         # Marquer l'e-mail comme lu
         mailbox.store(email.get("ID"), "+FLAGS", "\\Seen")
 
@@ -401,10 +602,19 @@ def process_emails(db_connection):
 # Planifier l'exécution du traitement des e-mails toutes les CHECK_INTERVAL secondes
 schedule.every(CHECK_INTERVAL).seconds.do(process_emails, db_connection)
 
+# Fonction pour enregistrer l'interaction dans la base de données
+def save_interaction_to_database(email_id, personal_info, response, db_connection):
+    cursor = db_connection.cursor()
+    cursor.execute(
+        "INSERT INTO interactions (email_id, personal_info, response) VALUES (?, ?, ?)",
+        (email_id, json.dumps(personal_info), response),
+    )
+    db_connection.commit()
+
 # Boucle d'exécution principale
 if __name__ == "__main__":
     # Connexion à la base de données
-    db_connection = sqlite3.connect("AskAlixMemory.db")
+    db_connection = sqlite3.connect(DATABASE_FILE)
     cursor = db_connection.cursor()
 
     # Création de la table interactions si elle n'existe pas déjà
