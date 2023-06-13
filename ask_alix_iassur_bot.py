@@ -18,7 +18,7 @@ from googlesearch import get_random_user_agent
 
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
-EMAIL_ADDRESS = "questions-alix@iassurpro.com"
+BOT_EMAIL_ADRESS = "questions_alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "cvyolriqdmaehgeu"
 IMAP_SERVER = "imap.gmail.com"
 PASSWORD = "cvyolriqdmaehgeu"
@@ -38,9 +38,76 @@ db_connection = sqlite3.connect(DATABASE_PATH)
 RECEIVER_ADRESS = email_id
 EMAIL_ID = extract_email_id(EMAIL_ADDRESS)
 
-# Fonction pour extraire l'adresse e-mail à partir de l'e-mail entrant
-def extract_email_address(email):
-    return email.get("From")
+# Définition générale
+SENDER_ADDRESS = "questions-alix@iassurpro.com"
+RECEIVER_ADRESS = email_id
+
+# Fonction pour extraire l'adresse e-mail de l'email entrant
+def extract_email_from_email(email):
+    email_address = email.sender
+    return email_address
+
+# Fonction pour extraire le nom et le prénom à partir de l'adresse e-mail
+def extract_name_from_email(email_address):
+    parts = email_address.split("@")
+    if len(parts) >= 2:
+        name_parts = parts[0].split(".")
+        if len(name_parts) >= 2:
+            firstname = name_parts[0]
+            lastname = name_parts[1]
+            return firstname, lastname
+    return None, None
+
+# Fonction pour extraire la signature et vérifier la présence d'un lien LinkedIn
+def extract_signature_from_email(email):
+    signature = email.signature
+    linkedin_url = None
+    if signature:
+        # Recherche d'un lien LinkedIn dans la signature
+        if "linkedin.com" in signature:
+            linkedin_url = extract_linkedin_url_from_signature(signature)
+    return signature, linkedin_url
+
+# Fonction pour extraire les informations personnelles à partir de l'email
+def extract_personal_info_from_email(email):
+    email_address = extract_email_from_email(email)
+    firstname, lastname = extract_name_from_email(email_address)
+    signature, linkedin_url = extract_signature_from_email(email)
+    
+    personal_info = {
+        "Nom": lastname,
+        "Prénom": firstname,
+        "Lien LinkedIn": linkedin_url
+    }
+    return personal_info
+
+# Fonction pour extraire les informations du profil LinkedIn
+def extract_linkedin_profile_info(linkedin_url):
+    # Code pour extraire les informations du profil LinkedIn
+    # ...
+    return profile_info
+
+# Fonction pour valider les données en recherchant sur Google
+def validate_data_with_google(firstname, lastname, domain):
+    query = f"{firstname} {lastname} {domain} LinkedIn"
+    # Code pour effectuer la recherche sur Google et valider les données
+    # ...
+    return is_valid
+
+# Fonction pour extraire les informations de profil
+def extract_profile_info(email):
+    personal_info = extract_personal_info_from_email(email)
+    firstname = personal_info["Prénom"]
+    lastname = personal_info["Nom"]
+    domain = email.domain
+    is_valid = validate_data_with_google(firstname, lastname, domain)
+    if is_valid:
+        linkedin_profile_info = extract_linkedin_profile_info(personal_info["Lien LinkedIn"])
+        # Extraire les autres informations du profil
+        # ...
+        return profile_info
+    else:
+        return None
 
 # Utilisation de la fonction pour extraire l'adresse e-mail
 email_id = extract_email_address(email)
