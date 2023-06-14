@@ -15,6 +15,8 @@ import sqlite3
 import re
 from googlesearch import search
 from googlesearch import get_random_user_agent
+from langdetect import detect_langs, lang_detect_exception
+from iso639 import languages
 
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
@@ -37,6 +39,8 @@ db_connection = sqlite3.connect(DATABASE_PATH)
 # Données liés au destinataire
 RECEIVER_ADRESS = email_id
 EMAIL_ID = extract_email_id(EMAIL_ADDRESS)
+LANGUAGE = detect_language(email_text)
+DETECTED_LANGUAGE = detect_language(email_text)
 
 # Définition générale
 SENDER_ADDRESS = "questions-alix@iassurpro.com"
@@ -123,7 +127,8 @@ db_connection.execute('''
         location TEXT,
         jobtitle TEXT,
         city TEXT,
-        country TEXT
+        country TEXT,
+        language TEXT
     )
 ''')
 
@@ -135,6 +140,7 @@ data = {
     'jobtitle': 'Engineer',
     'city': 'Paris',
     'country': 'France'
+    'language':'Français"
 }
 
 db_connection.execute('''
@@ -159,9 +165,43 @@ CHECK_INTERVAL = 60
 # Variables pour personnaliser la réponse
 BOT_NAME = "Alix"
 INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider à mieux comprendre le sujet des assurances professionnelles."
-GREETING_SENTENCE = "Je suis ravi de vous revoir, j'espère que vous vous portez bien! Je ferai de mon mieux pour vous aider aujourd'hui !"
+GREETING_SENTENCE = "Je suis ravi de vous revoir, j'espère que vous vous portez bien ! Je ferai de mon mieux pour vous aider aujourd'hui !"
 POLITE_CLOSING = "N'hésitez pas à me poser d'autres questions. Je suis là pour vous aider."
 POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales. Il est donc toujours conseillé de vérifier les sources officielles à jour et consulter votre expert IASSUR pour un accompagnement approfondi."
+
+def detect_language(text):
+    detected_lang = detect(text)
+    return detected_lang
+
+def translate_text(text, target_language):
+    response = openai.Completion.create(
+        engine='davinci',
+        prompt=text,
+        max_tokens=100,
+        temperature=0.7,
+        top_p=1.0,
+        frequency_penalty=0.0,
+        presence_penalty=0.0,
+        stop=None,
+        temperature=0.7
+    )
+
+    translated_text = response.choices[0].text.strip()
+    return translated_text
+
+# Détection de la langue de l'e-mail
+detected_language = detect_language(email_text)
+
+# Traduction des variables dans la langue détectée
+translated_intro = translate_text(INTRODUCTION_SENTENCE, detected_language)
+translated_greeting = translate_text(GREETING_SENTENCE, detected_language)
+translated_closing = translate_text(POLITE_CLOSING, detected_language)
+translated_post_scriptum = translate_text(POST_SCRIPTUM, detected_language)
+
+# Utilisation des variables traduites dans la réponse
+response = f"{translated_intro}\n\n{translated_greeting}\n\n{translated_closing}\n\n{translated_post_scriptum}"
+
+print(response)
 
 # Fonction pour envoyer un e-mail Gmail
 def send_gmail(sender_address, receiver_address, mail_subject, mail_content):
@@ -278,13 +318,13 @@ def extract_personal_info(email, body, db_connection):
 
 
 # Fonction pour enregistrer les informations personnelles dans la base de données
-def save_personal_info_to_database(email_id, personal_info, db_connection):
+def save_personal_info_to_database(email_id, personal_info, language, db_connection):
     db_connection.execute('''
-        INSERT INTO users (id, firstname, lastname, location, jobtitle, city, country)
-        VALUES (:id, :firstname, :lastname, :location, :jobtitle, :city, :country)
+        INSERT INTO users (id, firstname, lastname, location, jobtitle, city, country, language)
+        VALUES (:id, :firstname, :lastname, :location, :jobtitle, :city, :country, :language)
     ''', {"id": email_id, "firstname": personal_info.get("Prénom"), "lastname": personal_info.get("Nom"),
           "location": personal_info.get("Lieu"), "jobtitle": personal_info.get("Titre"),
-          "city": personal_info.get("Ville"), "country": personal_info.get("Pays")})
+          "city": personal_info.get("Ville"), "country": personal_info.get("Pays"), "language": language})
     db_connection.commit()
 
 # Fonction pour vérifier si les informations personnelles sont présentes dans la base de données
@@ -300,7 +340,7 @@ def is_personal_info_present_in_database(email_id, db_connection):
 def get_personal_info_from_database(email_id, db_connection):
     cursor = db_connection.cursor()
     cursor.execute('''
-        SELECT firstname, lastname, location, jobtitle, city, country FROM users WHERE id = :id
+        SELECT firstname, lastname, location, jobtitle, city, country, language FROM users WHERE id = :id
     ''', {"id": email_id})
     row = cursor.fetchone()
     if row:
@@ -310,9 +350,11 @@ def get_personal_info_from_database(email_id, db_connection):
             "Lieu": row[2],
             "Titre": row[3],
             "Ville": row[4],
-            "Pays": row[5]
+            "Pays": row[5],
+            "Langue": row[6]
         }
     return None
+
 
 # Fonction pour extraire les informations personnelles depuis l'adresse e-mail
 def extract_personal_info_from_email_address(email_address):
