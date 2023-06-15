@@ -14,9 +14,11 @@ import schedule
 import sqlite3
 import re
 from googlesearch import search
+from googletrans import Translator
 from googlesearch import get_random_user_agent
 from langdetect import detect_langs, lang_detect_exception
 from iso639 import languages
+from datetime import datetime
 
 # Informations d'identification Gmail
 GMAIL_ADDRESS = "questions-alix@iassurpro.com"
@@ -355,6 +357,163 @@ def get_personal_info_from_database(email_id, db_connection):
         }
     return None
 
+# Fonction pour enregistrer les informations de l'e-mail dans la base de données
+def save_email_info_to_database(email_id, email_type, location):
+    db_connection = sqlite3.connect('AskAlixMemory.db')
+    cursor = db_connection.cursor()
+
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Enregistrer l'e-mail entrant
+    if email_type == 'incoming':
+        cursor.execute('''
+            INSERT INTO emails (email_id, email_type, location, incoming_datetime)
+            VALUES (?, ?, ?, ?)
+        ''', (email_id, email_type, location, current_datetime))
+
+    # Enregistrer l'e-mail sortant
+    elif email_type == 'outgoing':
+        cursor.execute('''
+            UPDATE emails
+            SET outgoing_datetime = ?
+            WHERE email_id = ?
+        ''', (current_datetime, email_id))
+
+    db_connection.commit()
+    db_connection.close()
+
+# Exemple d'utilisation
+email_id = '123456789'
+email_type = 'incoming'
+location = 'Paris'
+
+save_email_info_to_database(email_id, email_type, location)
+
+# Fonction pour récupérer les données d'une entreprise à partir de la base de données du pays
+def get_company_data_from_country_database(domain, country_code):
+    # Vérifier le pays du domaine
+    if country_code == "FR":
+        # Appel à l'API de la base de données française (ex: Infogreffe)
+        # Effectuer la requête API pour récupérer les données de l'entreprise
+        response = requests.get(f"https://api.infogreffe.fr/v1/companies?domain={domain}")
+        data = response.json()
+        # Traiter les données de l'entreprise
+        # ...
+
+    # Ajouter d'autres conditions pour les autres pays et bases de données
+    # ...
+
+    else:
+        # Si le pays n'a pas de base de données spécifique, utiliser OpenCorporates
+        # Appel à l'API d'OpenCorporates
+        response = requests.get(f"https://api.opencorporates.com/companies/search?q={domain}&country_code={country_code}")
+        data = response.json()
+        # Traiter les données de l'entreprise
+        # ...
+
+    return data
+
+
+# Fonction pour récupérer les données d'une entreprise à partir de la base de données mondiale (OpenCorporates)
+def get_company_data_from_global_database(domain):
+    # Appel à l'API d'OpenCorporates
+    response = requests.get(f"https://api.opencorporates.com/companies/search?q={domain}")
+    data = response.json()
+    # Traiter les données de l'entreprise
+    # ...
+
+    return data
+
+
+# Exemple d'utilisation
+domain = "example.com"  # Domaine de l'adresse email
+country_code = "FR"  # Code du pays (ex: FR pour France)
+
+# Récupérer les données de l'entreprise à partir de la base de données spécifique au pays
+company_data = get_company_data_from_country_database(domain, country_code)
+
+# Si les données de l'entreprise n'ont pas été trouvées dans la base de données spécifique au pays,
+# récupérer les données de l'entreprise à partir de la base de données mondiale (OpenCorporates)
+if not company_data:
+    company_data = get_company_data_from_global_database(domain)
+
+# Traiter les données de l'entreprise et mettre à jour la fiche d'identification de l'utilisateur
+# ...
+
+# Fonction pour traduire le texte vers l'anglais
+def translate_to_english(text):
+    translator = Translator()
+    translation = translator.translate(text, dest='en')
+    return translation.text
+
+
+# Fonction pour récupérer les données d'une entreprise à partir de la base de données du pays
+def get_company_data_from_country_database(domain, country_code):
+    # Vérifier le pays du domaine
+    if country_code == "FR":
+        # Appel à l'API de la base de données française (ex: Infogreffe)
+        # Effectuer la requête API pour récupérer les données de l'entreprise
+        response = requests.get(f"https://api.infogreffe.fr/v1/companies?domain={domain}")
+        data = response.json()
+        # Traiter les données de l'entreprise
+        if "name" in data:
+            name = translate_to_english(data["name"])
+            # Enregistrer le nom de l'entreprise dans la base de données anglaise
+            # ...
+
+        if "address" in data:
+            address = translate_to_english(data["address"])
+            # Enregistrer l'adresse de l'entreprise dans la base de données anglaise
+            # ...
+
+        # Ajouter d'autres informations spécifiques à extraire et à enregistrer dans la base de données anglaise
+        # ...
+
+    # Ajouter d'autres conditions pour les autres pays et bases de données
+    # ...
+
+    else:
+        # Si le pays n'a pas de base de données spécifique, utiliser OpenCorporates
+        # Appel à l'API d'OpenCorporates
+        response = requests.get(f"https://api.opencorporates.com/companies/search?q={domain}&country_code={country_code}")
+        data = response.json()
+        # Traiter les données de l'entreprise
+        if "name" in data:
+            name = translate_to_english(data["name"])
+            # Enregistrer le nom de l'entreprise dans la base de données anglaise
+            # ...
+
+        if "address" in data:
+            address = translate_to_english(data["address"])
+            # Enregistrer l'adresse de l'entreprise dans la base de données anglaise
+            # ...
+
+        # Ajouter d'autres informations spécifiques à extraire et à enregistrer dans la base de données anglaise
+        # ...
+
+    return data
+
+
+# Fonction pour récupérer les données d'une entreprise à partir de la base de données mondiale (OpenCorporates)
+def get_company_data_from_global_database(domain):
+    # Appel à l'API d'OpenCorporates
+    response = requests.get(f"https://api.opencorporates.com/companies/search?q={domain}")
+    data = response.json()
+    # Traiter les données de l'entreprise
+    if "name" in data:
+        name = translate_to_english(data["name"])
+        # Enregistrer le nom de l'entreprise dans la base de données anglaise
+        # ...
+
+    if "address" in data:
+        address = translate_to_english(data["address"])
+        # Enregistrer l'adresse de l'entreprise dans la base de données anglaise
+        # ...
+
+    # Ajouter d'autres informations spécifiques à extraire et à enregistrer dans la base de données anglaise
+    # ...
+
+    return data
 
 # Fonction pour extraire les informations personnelles depuis l'adresse e-mail
 def extract_personal_info_from_email_address(email_address):
