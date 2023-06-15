@@ -46,6 +46,7 @@ DETECTED_LANGUAGE = detect_language(email_text)
 
 # Définition générale
 SENDER_ADDRESS = "questions-alix@iassurpro.com"
+BOT_EMAIL_ADRESS = sender_adress
 RECEIVER_ADRESS = email_id
 
 # Fonction pour extraire l'adresse e-mail de l'email entrant
