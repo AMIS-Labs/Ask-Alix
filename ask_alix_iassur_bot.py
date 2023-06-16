@@ -65,6 +65,95 @@ def extract_name_from_email(email_address):
             return firstname, lastname
     return None, None
 
+# Fonction pour extraire les informations à partir de la signature de l'e-mail si présente
+nlp_en = spacy.load('en_core_web_sm')
+nlp_fr = spacy.load('fr_core_news_sm')
+nlp_es = spacy.load('es_core_news_sm')
+nlp_de = spacy.load('de_core_news_sm')
+nlp_models = {'en': nlp_en, 'fr': nlp_fr, 'es': nlp_es, 'de': nlp_de}
+
+PHONE_REGEX = r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
+
+def extract_info_from_signature(signature, nlp):
+    doc = nlp(signature)
+    names = [entity.text for entity in doc.ents if entity.label_ == 'PERSON']
+    places = [entity.text for entity in doc.ents if entity.label_ == 'GPE']
+    phone_match = re.search(PHONE_REGEX, signature)
+    phone_number = phone_match.group(0) if phone_match else None
+    lines = [line.strip() for line in signature.split('\n') if line.strip()]
+
+    company_name = lines[-1] if lines else None
+    job_title = lines[-2] if len(lines) > 1 else None
+
+    return {
+        'lastname': lastname,
+        'firstname': firstname,
+        'city': city,
+        'phone_number': phone_number,
+        'company_name': company_name,
+        'job_title': job_title,
+    }
+
+def process_email(email):
+    try:
+        email_body = email.body
+    except AttributeError:
+        print("L'objet email n'a pas d'attribut 'body'.")
+        return None
+
+    signature = email_body.split('--')[-1]
+    lang = detect(signature)
+    nlp = nlp_models.get(lang, nlp_en, nlp_fr, nlp_es, nlp_de)
+    info = extract_info_from_signature(signature, nlp)
+
+    return info
+
+def store_email_info(email_id, info):
+    DATABASE_PATH = 'AskAlixMemory.db'
+    conn = sqlite3.connect(DATABASE_PATH)
+    c = conn.cursor()
+
+    # Create table if not exists
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY,
+        firstname TEXT,
+        lastname TEXT,
+        location TEXT,
+        jobtitle TEXT,
+        city TEXT,
+        country TEXT,
+        language TEXT
+    )
+''')
+
+# Insérer les données dans la table
+data = {
+    'firstname': 'John',
+    'lastname': 'Doe',
+    'location': 'Paris',
+    'jobtitle': 'Engineer',
+    'city': 'Paris',
+    'country': 'France'
+    'language':'Français"
+}
+
+    # Store email info in the database
+    first_name = info['names'][0].split()[0] if info['names'] else None
+    last_name = info['names'][0].split()[1] if info['names'] else None
+    c.execute('''
+        INSERT INTO emails (id, first_name, last_name, job_title, phone_number, company_name)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (email_id, first_name, last_name, info['job_title'], info['phone_number'], info['company_name']))
+
+    conn.commit()
+    conn.close()
+
+# Simulate processing an email
+email = type('email', (), {'body': "Hi there,--John Doe\nCEO at ACME\n555-123-4567\nACME"})
+info = process_email(email)
+store_email_info('1234', info)
+
 # Fonction pour extraire la signature et vérifier la présence d'un lien LinkedIn
 def extract_signature_from_email(email):
     signature = email.signature
