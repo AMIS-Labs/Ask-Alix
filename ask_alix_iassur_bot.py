@@ -22,13 +22,13 @@ from datetime import datetime
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-
 # Informations d'identification Gmail
-BOT_EMAIL_ADRESS = "questions_alix@iassurpro.com"
-GMAIL_APP_PASSWORD = "cvyolriqdmaehgeu"
+BOT_EMAIL_ADRESS = os.environ["GMAIL_ADDRESS"]
+GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 IMAP_SERVER = "imap.gmail.com"
-PASSWORD = "cvyolriqdmaehgeu"
-SENDER_ADRESS = "questions-alix@iassurpro.com"
+PASSWORD = os.environ["GMAIL_PASSWORD"]
+SENDER_ADRESS = os.environ["GMAIL_ADDRESS"]
+GMAIL_ADRESS = os.environ["GMAIL_ADDRESS"]
 
 # Nom de la base de données SQLite
 DATABASE_NAME = "AskAlixMemory"
@@ -48,7 +48,7 @@ DETECTED_LANGUAGE = detect_language(email_text)
 SIGNATURE = email_body.split('--')[-1]
 
 # Définition générale
-SENDER_ADDRESS = "questions-alix@iassurpro.com"
+SENDER_ADDRESS = os.environ["GMAIL_ADDRESS"]
 BOT_EMAIL_ADRESS = sender_adress
 RECEIVER_ADRESS = email_id
 
