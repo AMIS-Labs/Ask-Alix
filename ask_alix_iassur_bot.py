@@ -19,9 +19,11 @@ from googlesearch import get_random_user_agent
 from langdetect import detect_langs, lang_detect_exception
 from iso639 import languages
 from datetime import datetime
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 
 # Informations d'identification Gmail
-GMAIL_ADDRESS = "questions-alix@iassurpro.com"
 BOT_EMAIL_ADRESS = "questions_alix@iassurpro.com"
 GMAIL_APP_PASSWORD = "cvyolriqdmaehgeu"
 IMAP_SERVER = "imap.gmail.com"
@@ -40,9 +42,10 @@ db_connection = sqlite3.connect(DATABASE_PATH)
 
 # Données liés au destinataire
 RECEIVER_ADRESS = email_id
-EMAIL_ID = extract_email_id(EMAIL_ADDRESS)
+EMAIL_ID = extract_email_from_email(email)
 LANGUAGE = detect_language(email_text)
 DETECTED_LANGUAGE = detect_language(email_text)
+SIGNATURE = email_body.split('--')[-1]
 
 # Définition générale
 SENDER_ADDRESS = "questions-alix@iassurpro.com"
@@ -63,7 +66,9 @@ def extract_name_from_email(email_address):
             firstname = name_parts[0]
             lastname = name_parts[1]
             return firstname, lastname
-    return None, None
+            except AttributeError:
+        print("L'extraction du nom et prénom à partir de l'adresse email a échoué.")
+        return None, None
 
 # Fonction pour extraire les informations à partir de la signature de l'e-mail si présente
 nlp_en = spacy.load('en_core_web_sm')
@@ -75,6 +80,7 @@ nlp_models = {'en': nlp_en, 'fr': nlp_fr, 'es': nlp_es, 'de': nlp_de}
 PHONE_REGEX = r'\b\d{3}[-.]?\d{3}[-.]?\d{4}\b'
 
 def extract_info_from_signature(signature, nlp):
+    try:
     doc = nlp(signature)
     names = [entity.text for entity in doc.ents if entity.label_ == 'PERSON']
     places = [entity.text for entity in doc.ents if entity.label_ == 'GPE']
@@ -89,10 +95,13 @@ def extract_info_from_signature(signature, nlp):
         'lastname': lastname,
         'firstname': firstname,
         'city': city,
-        'phone_number': phone_number,
+        'pro_phone_number': phone_number,
         'company_name': company_name,
         'job_title': job_title,
     }
+    except AttributeError:
+        print("L'extraction des données à partir de la signature a échoué, absence de signature.")
+        return None, None
 
 def process_email(email):
     try:
@@ -124,6 +133,8 @@ def store_email_info(email_id, info):
         city TEXT,
         country TEXT,
         language TEXT
+        company_name TEXT
+        pro_phone_number TEXT
     )
 ''')
 
@@ -134,41 +145,48 @@ data = {
     'location': 'Paris',
     'jobtitle': 'Engineer',
     'city': 'Paris',
-    'country': 'France'
-    'language':'Français"
+    'country': 'France',
+    'language':'Français',
+    'company_name':'Microsoft',
+    'pro_phone_number':'+33678906523',
 }
+
+db_connection.execute('''
+    INSERT INTO users (firstname, lastname, location, jobtitle, city, country)
+    VALUES (:firstname, :lastname, :location, :jobtitle, :city, :country)
+''', data)
 
     # Store email info in the database
     first_name = info['names'][0].split()[0] if info['names'] else None
     last_name = info['names'][0].split()[1] if info['names'] else None
     c.execute('''
-        INSERT INTO emails (id, first_name, last_name, job_title, phone_number, company_name)
+        INSERT INTO emails (id, first_name, last_name, job_title, pro_phone_number, company_name)
         VALUES (?, ?, ?, ?, ?, ?)
-    ''', (email_id, first_name, last_name, info['job_title'], info['phone_number'], info['company_name']))
+    ''', (email_id, first_name, last_name, info['job_title'], info['pro_phone_number'], info['company_name']))
 
     conn.commit()
     conn.close()
 
-# Simulate processing an email
-email = type('email', (), {'body': "Hi there,--John Doe\nCEO at ACME\n555-123-4567\nACME"})
-info = process_email(email)
-store_email_info('1234', info)
-
 # Fonction pour extraire la signature et vérifier la présence d'un lien LinkedIn
 def extract_signature_from_email(email):
+    try:
     signature = email.signature
     linkedin_url = None
     if signature:
         # Recherche d'un lien LinkedIn dans la signature
         if "linkedin.com" in signature:
             linkedin_url = extract_linkedin_url_from_signature(signature)
-    return signature, linkedin_url
+        return signature, linkedin_url
+    except AttributeError:
+        print("absence de lien linkedin dans la signature")
+        return None, None
 
 # Fonction pour extraire les informations personnelles à partir de l'email
 def extract_personal_info_from_email(email):
+    try:
     email_address = extract_email_from_email(email)
     firstname, lastname = extract_name_from_email(email_address)
-    signature, linkedin_url = extract_signature_from_email(email)
+    signature, linkedin_url = extract_linkedin_url_from_signature(signature)
     
     personal_info = {
         "Nom": lastname,
@@ -176,69 +194,88 @@ def extract_personal_info_from_email(email):
         "Lien LinkedIn": linkedin_url
     }
     return personal_info
+   except AttributeError:
+        print("d'information personnelles sur le corps de l'email")
+        return None, None
+    
 
-# Fonction pour extraire les informations du profil LinkedIn
-def extract_linkedin_profile_info(linkedin_url):
-    # Code pour extraire les informations du profil LinkedIn
+# initialisation de la base de données
+conn = sqlite3.connect('your_database.db')
+c = conn.cursor()
+
+# Les informations d'identification de l'API Google
+scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
+         "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', scope)
+client = gspread.authorize(creds)
+
+# Votre URL de formulaire Google
+form_url = "your_google_form_url"
+
+# Vos informations de courriel Gmail
+GMAIL_ADDRESS = "your_gmail_address"
+GMAIL_PASSWORD = "your_gmail_password"
+
+# Dictionnaire pour stocker le nombre de messages par adresse e-mail
+email_counter = {}
+
+def handle_incoming_email(email):
+    global email_counter
+
+    email_id = email['id']
+    from_address = email['from']
+    # Incrémenter le compteur pour cette adresse e-mail
+    email_counter[from_address] = email_counter.get(from_address, 0) + 1
+
+    # Si c'est le 3ème message de cette adresse e-mail, envoyer le lien vers le formulaire
+    if email_counter[from_address] == 3 or (email_counter[from_address] > 3 and email_counter[from_address] % 5 == 0):
+        send_form_link(form_url, from_address)
+
+    # Si le formulaire a été rempli, enregistrer les données dans la base de données SQLite
+    if form_filled(from_address):
+        form_data = fetch_form_data(from_address)
+        save_to_db(form_data, email_id, from_address)
+
+def send_form_link(form_url, to_address):
+    # Code pour envoyer le lien vers le formulaire à l'adresse e-mail
     # ...
-    return profile_info
 
-# Fonction pour valider les données en recherchant sur Google
-def validate_data_with_google(firstname, lastname, domain):
-    query = f"{firstname} {lastname} {domain} LinkedIn"
-    # Code pour effectuer la recherche sur Google et valider les données
+def form_filled(email_address):
+    # Code pour vérifier si le formulaire a été rempli
     # ...
-    return is_valid
 
-# Fonction pour extraire les informations de profil
-def extract_profile_info(email):
-    personal_info = extract_personal_info_from_email(email)
-    firstname = personal_info["Prénom"]
-    lastname = personal_info["Nom"]
-    domain = email.domain
-    is_valid = validate_data_with_google(firstname, lastname, domain)
-    if is_valid:
-        linkedin_profile_info = extract_linkedin_profile_info(personal_info["Lien LinkedIn"])
-        # Extraire les autres informations du profil
-        # ...
-        return profile_info
-    else:
-        return None
+def fetch_form_data(email_address):
+    # Ouverture du Google sheet
+    sheet = client.open('your_spreadsheet_name').sheet1
 
-# Utilisation de la fonction pour extraire l'adresse e-mail
-email_id = extract_email_address(email)
-print("Email address:", email_id)
+    # Obtenir toutes les valeurs du Google sheet
+    all_values = sheet.get_all_values()
+
+    # Chercher les données pour l'adresse e-mail donnée et retourner les données
+    for row in all_values:
+        if row[0] == email_address:
+            return row[1:]
+    return None
+
+def save_to_db(data, email_id, email_address):
+    # Code pour sauvegarder les données dans la base de données SQLite
+    # Enregistrer également les données dans Google Sheets
+    # ...
+
+def send_auto_reply(sender, subject, question, response):
+    receiver_email = sender
+    reply_subject = f"Re: {subject}"
+    reply_message = f"Bonjour,\n\n{response}\n\nCordialement,\nVotre équipe"
+    send_gmail(GMAIL_ADDRESS, receiver_email, reply_subject, reply_message)
+
+def send_gmail(sender, receiver, subject, message):
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+    msg.attach(MIMEText(message, '
 
 
-# Créer la table avec les colonnes appropriées
-db_connection.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY,
-        firstname TEXT,
-        lastname TEXT,
-        location TEXT,
-        jobtitle TEXT,
-        city TEXT,
-        country TEXT,
-        language TEXT
-    )
-''')
-
-# Insérer les données dans la table
-data = {
-    'firstname': 'John',
-    'lastname': 'Doe',
-    'location': 'Paris',
-    'jobtitle': 'Engineer',
-    'city': 'Paris',
-    'country': 'France'
-    'language':'Français"
-}
-
-db_connection.execute('''
-    INSERT INTO users (firstname, lastname, location, jobtitle, city, country)
-    VALUES (:firstname, :lastname, :location, :jobtitle, :city, :country)
-''', data)
 
 # Clé secrète OpenAI
 openai.api_key = os.environ["OPENAI_API_KEY"]
