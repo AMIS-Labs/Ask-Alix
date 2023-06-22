@@ -118,8 +118,7 @@ def process_email(email):
     return info
 
 def store_email_info(email_id, info):
-    DATABASE_PATH = 'AskAlixMemory.db'
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_FILE)
     c = conn.cursor()
 
     # Create table if not exists
@@ -128,6 +127,7 @@ def store_email_info(email_id, info):
         id INTEGER PRIMARY KEY,
         firstname TEXT,
         lastname TEXT,
+        email_id TEXT,
         location TEXT,
         jobtitle TEXT,
         city TEXT,
@@ -142,6 +142,7 @@ def store_email_info(email_id, info):
 data = {
     'firstname': 'John',
     'lastname': 'Doe',
+    'email_id': 'john.doe@microsoft.com',
     'location': 'Paris',
     'jobtitle': 'Engineer',
     'city': 'Paris',
@@ -152,15 +153,15 @@ data = {
 }
 
 db_connection.execute('''
-    INSERT INTO users (firstname, lastname, location, jobtitle, city, country)
-    VALUES (:firstname, :lastname, :location, :jobtitle, :city, :country)
+    INSERT INTO users (firstname, lastname, email_id, location, jobtitle, city, country)
+    VALUES (:firstname, :lastname, :email_id, :location, :jobtitle, :city, :country)
 ''', data)
 
     # Store email info in the database
     first_name = info['names'][0].split()[0] if info['names'] else None
     last_name = info['names'][0].split()[1] if info['names'] else None
     c.execute('''
-        INSERT INTO emails (id, first_name, last_name, job_title, pro_phone_number, company_name)
+        INSERT INTO emails (email_id, first_name, last_name, email_id, job_title, pro_phone_number, company_name)
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (email_id, first_name, last_name, info['job_title'], info['pro_phone_number'], info['company_name']))
 
@@ -200,7 +201,7 @@ def extract_personal_info_from_email(email):
     
 
 # initialisation de la base de données
-conn = sqlite3.connect('your_database.db')
+conn = sqlite3.connect(DATABASE_FILE)
 c = conn.cursor()
 
 # Les informations d'identification de l'API Google
@@ -210,11 +211,11 @@ creds = ServiceAccountCredentials.from_json_keyfile_name('client_secret.json', s
 client = gspread.authorize(creds)
 
 # Votre URL de formulaire Google
-form_url = "your_google_form_url"
+form_url = "https://docs.google.com/forms/d/e/1FAIpQLSe_3MZPKjeqN7IqvR3uaNmfUVC4ccIAikAL0k2i4e1a9mtS4A/viewform?embedded=true"
 
 # Vos informations de courriel Gmail
-GMAIL_ADDRESS = "your_gmail_address"
-GMAIL_PASSWORD = "your_gmail_password"
+GMAIL_ADDRESS = os.environ["GMAIL_ADDRESS"]
+GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 
 # Dictionnaire pour stocker le nombre de messages par adresse e-mail
 email_counter = {}
@@ -222,7 +223,7 @@ email_counter = {}
 def handle_incoming_email(email):
     global email_counter
 
-    email_id = email['id']
+    email_id = extract_email_from_email(email)
     from_address = email['from']
     # Incrémenter le compteur pour cette adresse e-mail
     email_counter[from_address] = email_counter.get(from_address, 0) + 1
@@ -273,8 +274,18 @@ def send_gmail(sender, receiver, subject, message):
     msg['From'] = sender
     msg['To'] = receiver
     msg['Subject'] = subject
-    msg.attach(MIMEText(message, '
-
+    msg.attach(MIMEText(message, 'plain'))
+    try:
+        server = smtplib.SMTP('smtp.gmail.com: 587')
+        server.ehlo()
+        server.starttls()
+        server.login(sender, GMAIL_PASSWORD)
+        text = msg.as_string()
+        server.sendmail(sender, receiver, text)
+        server.quit()
+        print('Email sent successfully!')
+    except Exception as e:
+        print(f'Failed to send email: {e}')
 
 
 # Clé secrète OpenAI
