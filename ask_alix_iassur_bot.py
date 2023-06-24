@@ -200,7 +200,8 @@ def extract_personal_info_from_email(email):
         return None, None
     
 
-# initialisation de la base de données
+# Initialisation de la base de données
+DATABASE_FILE = "AskAlixMemory.db"
 conn = sqlite3.connect(DATABASE_FILE)
 c = conn.cursor()
 
@@ -214,36 +215,37 @@ client = gspread.authorize(creds)
 form_url = "https://docs.google.com/forms/d/e/1FAIpQLSe_3MZPKjeqN7IqvR3uaNmfUVC4ccIAikAL0k2i4e1a9mtS4A/viewform?embedded=true"
 
 # Vos informations de courriel Gmail
-GMAIL_ADDRESS = os.environ["GMAIL_ADDRESS"]
-GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
+GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 
 # Dictionnaire pour stocker le nombre de messages par adresse e-mail
 email_counter = {}
 
-def handle_incoming_email(email):
-    global email_counter
-
-    email_id = extract_email_from_email(email)
-    from_address = email['from']
-    # Incrémenter le compteur pour cette adresse e-mail
-    email_counter[from_address] = email_counter.get(from_address, 0) + 1
-
-    # Si c'est le 3ème message de cette adresse e-mail, envoyer le lien vers le formulaire
-    if email_counter[from_address] == 3 or (email_counter[from_address] > 3 and email_counter[from_address] % 5 == 0):
-        send_form_link(form_url, from_address)
-
-    # Si le formulaire a été rempli, enregistrer les données dans la base de données SQLite
-    if form_filled(from_address):
-        form_data = fetch_form_data(from_address)
-        save_to_db(form_data, email_id, from_address)
+def send_gmail(sender, receiver, subject, message):
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+    msg.attach(MIMEText(message, 'plain'))
+    try:
+        server = smtplib.SMTP('smtp.gmail.com: 587')
+        server.ehlo()
+        server.starttls()
+        server.login(sender, GMAIL_APP_PASSWORD)
+        text = msg.as_string()
+        server.sendmail(sender, receiver, text)
+        server.quit()
+        print('Email sent successfully!')
+    except Exception as e:
+        print(f'Failed to send email: {e}')
 
 def send_form_link(form_url, to_address):
     # Code pour envoyer le lien vers le formulaire à l'adresse e-mail
-    # ...
+    send_gmail(GMAIL_ADDRESS, to_address, 'Veuillez remplir ce formulaire', f'Cliquez sur le lien suivant pour accéder au formulaire: {form_url}')
 
 def form_filled(email_address):
     # Code pour vérifier si le formulaire a été rempli
-    # ...
+    # ... (Ici, vous devrez écrire le code nécessaire pour vérifier si le formulaire a été rempli par l'utilisateur)
 
 def fetch_form_data(email_address):
     # Ouverture du Google sheet
@@ -260,32 +262,24 @@ def fetch_form_data(email_address):
 
 def save_to_db(data, email_id, email_address):
     # Code pour sauvegarder les données dans la base de données SQLite
+    # ... (Ici, vous devrez écrire le code nécessaire pour sauvegarder les données dans la base de données SQLite)
     # Enregistrer également les données dans Google Sheets
     # ...
 
-def send_auto_reply(sender, subject, question, response):
-    receiver_email = sender
-    reply_subject = f"Re: {subject}"
-    reply_message = f"Bonjour,\n\n{response}\n\nCordialement,\nVotre équipe"
-    send_gmail(GMAIL_ADDRESS, receiver_email, reply_subject, reply_message)
+def handle_incoming_email(email):
+    email_id = extract_email_from_email(email)
+    from_address = email['from']
+    # Incrémenter le compteur pour cette adresse e-mail
+    email_counter[from_address] = email_counter.get(from_address, 0) + 1
 
-def send_gmail(sender, receiver, subject, message):
-    msg = MIMEMultipart()
-    msg['From'] = sender
-    msg['To'] = receiver
-    msg['Subject'] = subject
-    msg.attach(MIMEText(message, 'plain'))
-    try:
-        server = smtplib.SMTP('smtp.gmail.com: 587')
-        server.ehlo()
-        server.starttls()
-        server.login(sender, GMAIL_PASSWORD)
-        text = msg.as_string()
-        server.sendmail(sender, receiver, text)
-        server.quit()
-        print('Email sent successfully!')
-    except Exception as e:
-        print(f'Failed to send email: {e}')
+    # Si c'est le 3ème, 10ème, 15ème message de cette adresse e-mail, etc., envoyer le lien vers le formulaire
+    if email_counter[from_address] in [3, 10, 15] or (email_counter[from_address] > 15 and email_counter[from_address] % 5 == 0):
+        send_form_link(form_url, from_address)
+
+    # Si le formulaire a été rempli, enregistrer les données dans la base de données SQLite
+    if form_filled(from_address):
+        form_data = fetch_form_data(from_address)
+        save_to_db(form_data, email_id, from_address)
 
 
 # Clé secrète OpenAI
