@@ -239,13 +239,25 @@ def send_gmail(sender, receiver, subject, message):
     except Exception as e:
         print(f'Failed to send email: {e}')
 
+# Envoyer une réponse automatique à l'expéditeur
 def send_form_link(form_url, to_address):
-    # Code pour envoyer le lien vers le formulaire à l'adresse e-mail
-    send_gmail(GMAIL_ADDRESS, to_address, 'Veuillez remplir ce formulaire', f'Cliquez sur le lien suivant pour accéder au formulaire: {form_url}')
-
+    receiver_email = email_id
+    reply_subject = f"Personnalisation de votre expérience d'utilisation de l'assistance Alix"
+    reply_message = f"Bonjour,\n\n\ Merci de votre utilisation du service d'assistance Alix, dans l'optique d'améliorer la qualité de mes réponses ainsi que vous offrir la meilleure expérience personnalisée possible, je vous invite à remplir ce formulaire ci-joint : n\n{form_url}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n"
+    send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
+    
 def form_filled(email_address):
-    # Code pour vérifier si le formulaire a été rempli
-    # ... (Ici, vous devrez écrire le code nécessaire pour vérifier si le formulaire a été rempli par l'utilisateur)
+    # Ouverture du Google sheet
+    sheet = client.open('your_spreadsheet_name').sheet1
+
+    # Obtenir toutes les valeurs du Google sheet
+    all_values = sheet.get_all_values()
+
+    # Chercher les données pour l'adresse e-mail donnée et retourner True si les données existent, False autrement
+    for row in all_values:
+        if row[0] == email_address:
+            return True
+    return False
 
 def fetch_form_data(email_address):
     # Ouverture du Google sheet
@@ -985,8 +997,8 @@ def process_emails(db_connection):
         email_id = email.get("ID")
         previous_data = get_previous_interaction_data(email_id, db_connection)
         if previous_data:
-            # Utiliser les données précédentes pour personnaliser la réponse
-            personal_info.update(previous_data)
+        # Utiliser les données précédentes pour personnaliser la réponse
+        personal_info.update(previous_data)
         prompt = generate_prompt(personal_info["Prénom"], body)
         response = generate_response(prompt, personal_info)
         send_auto_reply(sender, subject, body, response)
