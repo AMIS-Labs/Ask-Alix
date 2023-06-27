@@ -12,6 +12,7 @@ import requests
 import openai
 import schedule
 import sqlite3
+import socket
 import re
 from googlesearch import search
 from googletrans import Translator
@@ -23,11 +24,9 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # Informations d'identification Gmail
-BOT_EMAIL_ADRESS = os.environ["GMAIL_ADDRESS"]
 GMAIL_APP_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
 IMAP_SERVER = "imap.gmail.com"
 PASSWORD = os.environ["GMAIL_PASSWORD"]
-SENDER_ADRESS = os.environ["GMAIL_ADDRESS"]
 GMAIL_ADRESS = os.environ["GMAIL_ADDRESS"]
 
 # Nom de la base de données SQLite
@@ -45,12 +44,24 @@ RECEIVER_ADRESS = email_id
 EMAIL_ID = extract_email_from_email(email)
 LANGUAGE = detect_language(email_text)
 DETECTED_LANGUAGE = detect_language(email_text)
-SIGNATURE = email_body.split('--')[-1]
+RECEIVER = email_id
+EMAIL_ADRESS = email_id
 
 # Définition générale
 SENDER_ADDRESS = os.environ["GMAIL_ADDRESS"]
 BOT_EMAIL_ADRESS = sender_adress
-RECEIVER_ADRESS = email_id
+SENDER = os.environ["GMAIL_ADDRESS"]
+BOT_EMAIL_ADRESS = os.environ["GMAIL_ADDRESS"]
+SENDER_ADRESS = os.environ["GMAIL_ADDRESS"]
+
+
+def increment_sent_emails(conn, email_id):
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE Emails SET number_sent_emails = number_sent_emails + 1 WHERE email_id = ?;
+    ''', (email_id,))
+    conn.commit()
+    
 
 # Fonction pour extraire l'adresse e-mail de l'email entrant
 def extract_email_from_email(email):
@@ -84,13 +95,14 @@ def save_email_to_db(email_address):
         company_industry TEXT,
         user_desires TEXT,
         email_subjects TEXT,
-        nombre_email_entrants;
+        number_received_emails INTEGER DEFAULT 0,
+        number_sent_emails INTEGER DEFAULT 0);
         ''')
         
         # Insérez l'adresse e-mail dans la table. 
         # NOTE: à ce stade, nous insérons des valeurs NULL pour les autres champs.
         cursor.execute('''
-            INSERT OR IGNORE INTO Emails(email_id, lastname, firstname, jobtitle, company_name, company_city, company_country, company_industry, language, insurance_broker_name, insurance_company_name, contract_duration, email_subjects, nombre_email_entrants,)
+            INSERT OR IGNORE INTO Emails(email_id, lastname, firstname, jobtitle, company_name, company_city, company_country, company_industry, language, insurance_broker_name, insurance_company_name, contract_duration, email_subjects, number_received_emails,)
             VALUES (?, NULL, NULL, NULL);
         ''', (email_address,))
         
@@ -140,17 +152,28 @@ def send_gmail(sender, receiver, subject, message):
         print('Email sent successfully!')
     except Exception as e:
         print(f'Failed to send email: {e}')
+        
+        
+def handle_incoming_email(email):
+    email_id = extract_email_from_email(email)
+    from_address = email['from']
+    # Incrémenter le compteur pour cette adresse e-mail
+    email_counter[from_address] = email_counter.get(from_address, 0) + 1
+
+    # Si c'est le 3ème, 10ème, 15ème message de cette adresse e-mail, etc., envoyer le lien vers le formulaire
+    if email_counter[from_address] in [3, 10, 15] or (email_counter[from_address] > 15 and email_counter[from_address] % 5 == 0):
+        send_form_link(form_url, from_address)        
 
 # Envoyer une réponse automatique à l'expéditeur exclusivement qu'à partir du 3e message entrant
 def send_form_link(form_url, to_address):
     receiver_email = email_id
     reply_subject = f"Personnalisation de votre expérience d'utilisation de l'assistance Alix"
-    reply_message = f"Bonjour,\n\n\ Merci de votre utilisation du service d'assistance Alix, dans l'optique d'améliorer la qualité de mes réponses ainsi que vous offrir la meilleure expérience personnalisée possible, je vous invite à remplir ce formulaire ci-joint : n\n{form_url}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n"
+    reply_message = f"Bonjour,\n\n\ Merci de votre utilisation du service d'assistance Alix,\n\ndans l'optique d'améliorer la qualité de mes réponses ainsi que vous offrir la meilleure expérience personnalisée possible,\n\nje vous invite à remplir ce formulaire ci-joint : \n{form_url}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n"
     send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
     
 def form_filled(email_address):
     # Ouverture du Google sheet
-    sheet = client.open('your_spreadsheet_name').sheet1
+    sheet = client.open('ASK_ALIX_USERS_ID').sheet1
 
     # Obtenir toutes les valeurs du Google sheet
     all_values = sheet.get_all_values()
@@ -163,7 +186,7 @@ def form_filled(email_address):
 
 def fetch_form_data(email_address):
     # Ouverture du Google sheet
-    sheet = client.open('your_spreadsheet_name').sheet1
+    sheet = client.open('ASK_ALIX_USERS_ID').sheet1
 
     # Obtenir toutes les valeurs du Google sheet
     all_values = sheet.get_all_values()
@@ -173,27 +196,54 @@ def fetch_form_data(email_address):
         if row[0] == email_address:
             return row[1:]
     return None
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 def save_to_db(data, email_id, email_address):
-    # Code pour sauvegarder les données dans la base de données SQLite
-    # ... (Ici, vous devrez écrire le code nécessaire pour sauvegarder les données dans la base de données SQLite)
-    # Enregistrer également les données dans Google Sheets
-    # ...
+    # Connectez-vous à votre base de données SQLite
+    conn = sqlite3.connect('AskAlixmemory.db')
+    # Créez un curseur pour exécuter les commandes SQL
+    cursor = conn.cursor()
+    
+    # Exécutez une commande SQL INSERT pour insérer les données dans la table
+    cursor.execute('''
+        UPDATE Emails SET data = ? WHERE email_id = ?;
+    ''', (data, email_id))
 
-def handle_incoming_email(email):
-    email_id = extract_email_from_email(email)
-    from_address = email['from']
-    # Incrémenter le compteur pour cette adresse e-mail
-    email_counter[from_address] = email_counter.get(from_address, 0) + 1
+    # Validez (commit) les changements
+    conn.commit()
 
-    # Si c'est le 3ème, 10ème, 15ème message de cette adresse e-mail, etc., envoyer le lien vers le formulaire
-    if email_counter[from_address] in [3, 10, 15] or (email_counter[from_address] > 15 and email_counter[from_address] % 5 == 0):
-        send_form_link(form_url, from_address)
+    # Fermez la connexion à la base de données
+    conn.close()
+
+    # Google Sheets
+    # Définissez le scope
+    scope = ['https://spreadsheets.google.com/feeds','https://www.googleapis.com/auth/drive']
+
+    # Ajoutez vos informations d'identification
+    creds = ServiceAccountCredentials.from_json_keyfile_name('alix-assistant@ask-alix-users-id-ledger.iam.gserviceaccount.com', scope)
+
+    # Autorisez les informations d'identification
+    client = gspread.authorize(creds)
+
+    # Ouvrez la feuille de calcul
+    sheet = client.open('ASK_ALIX_USERS_ID').sheet1 # Assurez-vous de remplacer 'sheetname' par le nom de votre feuille de calcul
+
+    # Écrivez les données
+    sheet.append_row([email_id, data])
 
     # Si le formulaire a été rempli, enregistrer les données dans la base de données SQLite
     if form_filled(from_address):
         form_data = fetch_form_data(from_address)
         save_to_db(form_data, email_id, from_address)
+ 
+def is_valid_email_domain(email):
+    domain = email.split('@')[-1]
+    try:
+        socket.gethostbyname(domain)
+        return True
+    except socket.gaierror:  # cela signifie que le nom d'hôte n'a pas été trouvé
+        return False
 
 
 # Clé secrète OpenAI
@@ -212,10 +262,10 @@ CHECK_INTERVAL = 60
 
 # Variables pour personnaliser la réponse
 BOT_NAME = "Alix"
-INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle. Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider à mieux comprendre le sujet des assurances professionnelles."
-GREETING_SENTENCE = "Je suis ravi de vous revoir, j'espère que vous vous portez bien ! Je ferai de mon mieux pour vous aider aujourd'hui !"
-POLITE_CLOSING = "N'hésitez pas à me poser d'autres questions. Je suis là pour vous aider."
-POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales. Il est donc toujours conseillé de vérifier les sources officielles à jour et consulter votre expert IASSUR pour un accompagnement approfondi."
+INTRODUCTION_SENTENCE = "Je suis Alix, votre assistante virtuelle.\n\n\Je suis une intelligence artificielle produite par IASSUR dans le but de vous aider à mieux comprendre le sujet des assurances professionnelles."
+GREETING_SENTENCE = "Je suis ravi de vous revoir,\n\n\j'espère que vous vous portez bien !\n\n\Je ferai de mon mieux pour vous aider aujourd'hui !\n\n\"
+POLITE_CLOSING = "Il ne faut surtout pas à me poser d'autres questions.\n\n\Je suis là pour vous aider."
+POST_SCRIPTUM = "Veuillez noter que cette réponse est simulée et basée sur mes connaissances générales.\n\n\Il est donc toujours conseillé de vérifier les sources officielles à jour et consulter votre expert IASSUR pour un accompagnement approfondi."
 
 def detect_language(text):
     detected_lang = detect(text)
@@ -268,6 +318,14 @@ def send_gmail(sender_address, receiver_address, mail_subject, mail_content):
     session.sendmail(sender_address, receiver_address, text)
     session.quit()
     print("Sent email to " + receiver_address + " with subject: " + mail_subject)
+    
+    
+def increment_sent_emails(conn, email_id):
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE Emails SET number_sent_emails = number_sent_emails + 1 WHERE email_id = ?;
+    ''', (email_id,))
+    conn.commit()
 
 # Fonction pour se connecter à la boîte de réception
 def connect_to_mailbox():
@@ -289,6 +347,14 @@ def fetch_unread_emails(mailbox):
     return emails
 
 
+def increment_received_emails(conn, email_id):
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE Emails SET number_received_emails = number_received_emails + 1 WHERE email_id = ?;
+    ''', (email_id,))
+    conn.commit()
+
+
 # Fonction pour vérifier si les informations personnelles sont présentes dans la base de données
 def is_personal_info_present_in_database(email_id, db_connection):
     cursor = db_connection.cursor()
@@ -307,7 +373,7 @@ def get_personal_info_from_database(email_id, db_connection):
     row = cursor.fetchone()
     if row:
         return {
-            "Prénom": row[0],
+            "firstname": row[1],
             "Nom": row[1],
             "Lieu": row[2],
             "Titre": row[3],
@@ -316,6 +382,23 @@ def get_personal_info_from_database(email_id, db_connection):
             "Langue": row[6]
         }
     return None
+ firstname TEXT,
+        lastname TEXT,
+        email_id TEXT,
+        jobtitle TEXT,
+        company_city TEXT,
+        company_country TEXT,
+        language TEXT,
+        company_name TEXT,
+        insurance_broker_name TEXT,
+        insurance_company_name TEXT,
+        contract_duration TEXT,
+        company_industry TEXT,
+        user_desires TEXT,
+        email_subjects TEXT,
+        number_received_emails INTEGER DEFAULT 0,
+        number_sent_emails INTEGER DEFAULT 0);
+        firstname	lastname	job_title	company_name	company_city	company_country	pro_phone_number	email_adress	email_id	insurance_broker_name	insurance_company_name	contract_duration	company_industry	user_desires	email_subjects	number_received_emails	number_sent_emails
 
 # Fonction pour enregistrer les informations de l'e-mail dans la base de données
 def save_email_info_to_database(email_id, email_type, location):
