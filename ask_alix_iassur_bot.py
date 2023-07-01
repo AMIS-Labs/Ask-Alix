@@ -364,42 +364,56 @@ def is_personal_info_present_in_database(email_id, db_connection):
     count = cursor.fetchone()[0]
     return count > 0
 
+def update_email_subjects(email_address, email_subject, db_connection):
+    cursor = db_connection.cursor()
+    # récupérez les sujets d'email actuels pour cet email_address
+    cursor.execute('SELECT email_subjects FROM Emails WHERE email_id = ?', (email_address,))
+    result = cursor.fetchone()
+    if result is None:
+        # si l'email_address n'existe pas encore, insérez-le avec le nouveau sujet
+        cursor.execute('''
+            INSERT INTO Emails(email_id, email_subjects)
+            VALUES (?, ?);
+        ''', (email_address, email_subject))
+    else:
+        # si l'email_address existe déjà, ajoutez le nouveau sujet à la liste
+        current_subjects = result[0] if result[0] is not None else ""
+        new_subjects = current_subjects + "," + email_subject if current_subjects else email_subject
+        cursor.execute('''
+            UPDATE Emails SET email_subjects = ? WHERE email_id = ?;
+        ''', (new_subjects, email_address))
+
+    # Commitez les changements
+    db_connection.commit()
+
 # Fonction pour récupérer les informations personnelles depuis la base de données
 def get_personal_info_from_database(email_id, db_connection):
     cursor = db_connection.cursor()
     cursor.execute('''
-        SELECT firstname, lastname, location, jobtitle, city, country, language FROM users WHERE id = :id
+        SELECT firstname, lastname, email_id, jobtitle, company_city, company_country, language FROM users WHERE id = :id, company_name, insurance_broker_name, insurance_company_name, contract_duration, company_industry, user_desires, email_subjects, number_received_emails, number_sent_emails
     ''', {"id": email_id})
     row = cursor.fetchone()
     if row:
         return {
-            "firstname": row[1],
-            "Nom": row[1],
-            "Lieu": row[2],
-            "Titre": row[3],
-            "Ville": row[4],
-            "Pays": row[5],
-            "Langue": row[6]
+            "firstname": row[0],
+            "lastname": row[1],
+            "email_id": row[2],
+            "jobtitle": row[3],
+            "company_city": row[4],
+            "company_country": row[5],
+            "language": row[6],
+            "company_name": row[7]
+            "insurance_broker_name": row[8]
+            "insurance_company_name": row[9]
+            "contract_duration": row[10]
+            "company_industry": row[11]
+            "user_desires": row[12]
+            "email_subjects": row[13]
+            "number_received_emails": row[14]
+            "number_sent_emails": row[15]
         }
     return None
- firstname TEXT,
-        lastname TEXT,
-        email_id TEXT,
-        jobtitle TEXT,
-        company_city TEXT,
-        company_country TEXT,
-        language TEXT,
-        company_name TEXT,
-        insurance_broker_name TEXT,
-        insurance_company_name TEXT,
-        contract_duration TEXT,
-        company_industry TEXT,
-        user_desires TEXT,
-        email_subjects TEXT,
-        number_received_emails INTEGER DEFAULT 0,
-        number_sent_emails INTEGER DEFAULT 0);
-        firstname	lastname	job_title	company_name	company_city	company_country	pro_phone_number	email_adress	email_id	insurance_broker_name	insurance_company_name	contract_duration	company_industry	user_desires	email_subjects	number_received_emails	number_sent_emails
-
+        
 # Fonction pour enregistrer les informations de l'e-mail dans la base de données
 def save_email_info_to_database(email_id, email_type, location):
     db_connection = sqlite3.connect('AskAlixMemory.db')
@@ -485,10 +499,19 @@ def generate_prompt(sender_name, question):
     return prompt
 
 # Envoyer une réponse automatique à l'expéditeur
-def send_auto_reply(sender, subject, question, response):
+def send_auto_reply(sender, subject, question, response, db_connection):
     receiver_email = email_id
     reply_subject = f"Re: {subject}"
-    reply_message = f"Bonjour {personal_info['Prénom']},\n\n{response}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n{POST_SCRIPTUM}"
+    
+    # Récupérer les informations personnelles de la base de données
+    personal_info = get_personal_info_from_database(email_id, db_connection)
+
+    # Vérifier si le prénom est présent dans les informations personnelles
+    if personal_info and 'firstname' in personal_info:
+        reply_message = f"Bonjour {personal_info['firstname']},\n\n{response}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n{POST_SCRIPTUM}"
+    else:
+        reply_message = f"Bonjour,\n\n{response}\n\n{POLITE_CLOSING}\n\nAu plaisir de collaborer avec vous,\n{BOT_NAME}\n\n{POST_SCRIPTUM}"
+    
     send_gmail(GMAIL_ADDRESS, receiver, reply_subject, reply_message)
 
 def process_emails(db_connection):
